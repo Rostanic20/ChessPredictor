@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Engine Test</title>
+</head>
+<body>
+    <h1>Chess Engine Test</h1>
+    <div id="status">Testing...</div>
+    <div id="log"></div>
+    
+    <script src="stockfish-loader.js"></script>
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function addLog(message) {
+            log.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+        
+        // Test the engine loading
+        window.StockfishLoader.loadStockfish()
+            .then(worker => {
+                addLog('✅ Engine loaded successfully!');
+                status.textContent = 'Engine loaded!';
+                
+                // Test UCI communication
+                worker.onmessage = function(e) {
+                    addLog('Engine: ' + e.data);
+                };
+                
+                addLog('Sending UCI command...');
+                worker.postMessage('uci');
+                
+                setTimeout(() => {
+                    addLog('Sending isready command...');
+                    worker.postMessage('isready');
+                }, 1000);
+                
+                setTimeout(() => {
+                    addLog('Testing move generation...');
+                    worker.postMessage('position startpos');
+                    worker.postMessage('go depth 1');
+                }, 2000);
+            })
+            .catch(error => {
+                addLog('❌ Failed to load engine: ' + error.message);
+                status.textContent = 'Failed to load engine';
+            });
+    </script>
+</body>
+</html>

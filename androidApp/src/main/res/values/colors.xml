@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chess themed colors -->
+    <color name="chess_primary">#1976D2</color>
+    <color name="chess_on_primary">#FFFFFF</color>
+    <color name="chess_primary_container">#BBDEFB</color>
+    <color name="chess_on_primary_container">#0D47A1</color>
+    
+    <color name="chess_secondary">#8B4513</color>
+    <color name="chess_on_secondary">#FFFFFF</color>
+    <color name="chess_secondary_container">#F5DEB3</color>
+    <color name="chess_on_secondary_container">#5D2F0A</color>
+    
+    <color name="chess_surface">#FFFFFF</color>
+    <color name="chess_on_surface">#1C1C1C</color>
+    <color name="chess_surface_variant">#F5F5F5</color>
+    <color name="chess_on_surface_variant">#424242</color>
+    
+    <!-- Chess board colors -->
+    <color name="chess_light_square">#F0D9B5</color>
+    <color name="chess_dark_square">#B58863</color>
+    <color name="chess_highlight">#FFFF00</color>
+    <color name="chess_check">#FF5722</color>
+    <color name="chess_last_move">#81C784</color>
+    <color name="chess_possible_move">#4CAF50</color>
+    
+    <!-- Piece colors -->
+    <color name="chess_white_piece">#FFFFFF</color>
+    <color name="chess_black_piece">#212121</color>
+    
+    <!-- Additional UI colors -->
+    <color name="chess_error">#F44336</color>
+    <color name="chess_success">#4CAF50</color>
+    <color name="chess_warning">#FF9800</color>
+</resources>

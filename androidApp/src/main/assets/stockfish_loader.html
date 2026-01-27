@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stockfish Chess Engine</title>
+</head>
+<body>
+    <div id="status">Initializing...</div>
+    
+    <script>
+        var stockfish = null;
+        var isReady = false;
+        var commandQueue = [];
+        
+        // Send message to Android
+        function sendToAndroid(message) {
+            if (window.Android && window.Android.onMessage) {
+                window.Android.onMessage(message);
+            }
+        }
+        
+        // Override postMessage to capture Stockfish output
+        self.postMessage = function(msg) {
+            console.log('Stockfish output:', msg);
+            sendToAndroid(msg);
+            
+            // Check if engine is ready
+            if (msg === 'uciok') {
+                isReady = true;
+                document.getElementById('status').innerHTML = 'Ready - Optimizing...';
+                
+                // Send optimization commands first
+                if (window.optimizationCommands) {
+                    console.log('Applying engine optimizations...');
+                    window.optimizationCommands.forEach(function(cmd, index) {
+                        setTimeout(function() {
+                            console.log('Sending optimization:', cmd);
+                            sendCommandToStockfish(cmd);
+                            
+                            // After last optimization, mark as fully ready
+                            if (index === window.optimizationCommands.length - 1) {
+                                setTimeout(function() {
+                                    console.log('Engine fully optimized');
+                                    document.getElementById('status').innerHTML = 'Ready (Optimized)';
+                                    sendCommandToStockfish('isready');
+                                }, 50);
+                            }
+                        }, index * 50);
+                    });
+                }
+                
+                // Process queued commands after optimizations
+                setTimeout(function() {
+                    while (commandQueue.length > 0) {
+                        var cmd = commandQueue.shift();
+                        console.log('Sending queued command:', cmd);
+                        sendCommandToStockfish(cmd);
+                    }
+                    
+                    if (window.Android && window.Android.onReady) {
+                        window.Android.onReady();
+                    }
+                }, window.optimizationCommands ? window.optimizationCommands.length * 50 + 100 : 100);
+            }
+        };
+        
+        // Send command to Stockfish using the correct emscripten ccall method
+        function sendCommandToStockfish(cmd) {
+            try {
+                console.log('Sending command to Stockfish:', cmd);
+                
+                if (typeof Module !== 'undefined' && Module.ccall) {
+                    // This is the method used in the worker: Module.ccall("uci_command","number",["string"],[e.data])
+                    Module.ccall("uci_command", "number", ["string"], [cmd]);
+                    console.log('Command sent via ccall uci_command');
+                } else {
+                    console.error('Module.ccall not available');
+                }
+            } catch (e) {
+                console.error('Error sending command:', e);
+            }
+        }
+        
+        // Load stockfish.js and initialize
+        function initStockfish() {
+            try {
+                console.log('Loading Stockfish...');
+                
+                var script = document.createElement('script');
+                script.src = 'stockfish_browser.js';
+                script.onload = function() {
+                    console.log('Stockfish.js loaded successfully');
+                    
+                    // Small delay to ensure everything is loaded
+                    setTimeout(function() {
+                        setupStockfish();
+                    }, 1000);
+                };
+                script.onerror = function(e) {
+                    console.error('Failed to load stockfish.js:', e);
+                    if (window.Android) {
+                        window.Android.onError('Failed to load stockfish.js');
+                    }
+                };
+                document.head.appendChild(script);
+                
+            } catch (e) {
+                console.error('Error initializing:', e);
+                if (window.Android) {
+                    window.Android.onError('Init error: ' + e.message);
+                }
+            }
+        }
+        
+        // Setup Stockfish engine after loading
+        function setupStockfish() {
+            try {
+                console.log('Setting up Stockfish...');
+                console.log('Available Module functions:', typeof Module !== 'undefined' ? Object.keys(Module) : 'Module not found');
+                
+                if (typeof Module !== 'undefined' && Module.ccall) {
+                    console.log('Module.ccall found, setting up interface...');
+                    
+                    // Create stockfish interface that mimics Web Worker
+                    stockfish = {
+                        postMessage: function(cmd) {
+                            console.log('Stockfish postMessage called with:', cmd);
+                            if (cmd === 'quit') {
+                                // Handle quit command
+                                console.log('Quit command received');
+                                return;
+                            }
+                            
+                            // Send command using the same method as the worker
+                            sendCommandToStockfish(cmd);
+                        }
+                    };
+                    
+                    // Initialize UCI and optimize engine settings
+                    console.log('Sending UCI command...');
+                    sendCommandToStockfish('uci');
+                    
+                    // Queue engine optimization commands to be sent after uciok
+                    var optimizationCommands = [
+                        'setoption name Hash value 64',  // Reduced for mobile
+                        'setoption name Threads value 1',  // Single thread is fine
+                        'setoption name Ponder value false',  // No pondering for human-like play
+                        'setoption name MultiPV value 1',
+                        'setoption name Skill Level value 10',  // Default medium skill
+                        'setoption name Move Overhead value 100',  // Human reaction time
+                        'setoption name Minimum Thinking Time value 300',  // Min 300ms think time
+                        'setoption name UCI_LimitStrength value true',
+                        'setoption name UCI_Elo value 1600'  // Default to casual player
+                    ];
+                    
+                    // Store optimization commands for later execution
+                    window.optimizationCommands = optimizationCommands;
+                    
+                } else {
+                    console.error('Module.ccall not found');
+                    console.log('Available globals:', Object.keys(window));
+                    
+                    if (window.Android) {
+                        window.Android.onError('Module.ccall not available');
+                    }
+                }
+                
+            } catch (e) {
+                console.error('Error setting up Stockfish:', e);
+                if (window.Android) {
+                    window.Android.onError('Setup error: ' + e.message);
+                }
+            }
+        }
+        
+        // Optimized batch command processing
+        var commandBuffer = [];
+        var processingBatch = false;
+        
+        function processBatchCommands() {
+            if (processingBatch || commandBuffer.length === 0) return;
+            
+            processingBatch = true;
+            var batch = commandBuffer.splice(0, Math.min(5, commandBuffer.length)); // Process up to 5 commands at once
+            
+            batch.forEach(function(cmd, index) {
+                setTimeout(function() {
+                    if (stockfish && stockfish.postMessage && isReady) {
+                        stockfish.postMessage(cmd);
+                    }
+                    
+                    if (index === batch.length - 1) {
+                        processingBatch = false;
+                        // Schedule next batch if there are more commands
+                        if (commandBuffer.length > 0) {
+                            setTimeout(processBatchCommands, 5);
+                        }
+                    }
+                }, index * 2); // 2ms delay between commands in batch
+            });
+        }
+        
+        // Optimized global function for sending commands
+        window.sendCommand = function(cmd) {
+            if (stockfish && stockfish.postMessage) {
+                if (isReady) {
+                    // For immediate commands (go, stop, quit), send directly
+                    if (cmd.startsWith('go ') || cmd === 'stop' || cmd === 'quit' || cmd === 'isready') {
+                        console.log('Sending priority command:', cmd);
+                        stockfish.postMessage(cmd);
+                    } else {
+                        // Buffer other commands for batch processing
+                        commandBuffer.push(cmd);
+                        processBatchCommands();
+                    }
+                } else {
+                    console.log('Queueing command:', cmd);
+                    commandQueue.push(cmd);
+                }
+            } else {
+                console.log('Engine not initialized yet');
+            }
+        };
+        
+        // Start initialization when page loads
+        window.onload = function() {
+            console.log('Page loaded, starting initialization...');
+            
+            if (!window.Android) {
+                console.error('Android interface not found!');
+                document.getElementById('status').innerHTML = 'Error: Android interface not found';
+            } else {
+                console.log('Android interface found');
+                initStockfish();
+            }
+        };
+    </script>
+</body>
+</html>

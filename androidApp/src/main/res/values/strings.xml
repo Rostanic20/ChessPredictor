@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Chess Predictor</string>
+    
+    <!-- Main UI -->
+    <string name="new_game">New Game</string>
+    <string name="analyze">Analyze</string>
+    <string name="undo_move">Undo Move</string>
+    <string name="redo_move">Redo Move</string>
+    <string name="flip_board">Flip Board</string>
+    <string name="show_coordinates">Show Coordinates</string>
+    <string name="hide_coordinates">Hide Coordinates</string>
+    
+    <!-- Game Modes -->
+    <string name="vs_engine">vs Engine</string>
+    <string name="vs_human">vs Human</string>
+    <string name="analysis_mode">Analysis</string>
+    
+    <!-- Difficulty Levels -->
+    <string name="difficulty_beginner">Beginner</string>
+    <string name="difficulty_easy">Easy</string>
+    <string name="difficulty_medium">Medium</string>
+    <string name="difficulty_hard">Hard</string>
+    <string name="difficulty_expert">Expert</string>
+    <string name="difficulty_ultimate">Ultimate</string>
+    <string name="difficulty_custom">Custom</string>
+    
+    <!-- Game Status -->
+    <string name="white_to_move">White to move</string>
+    <string name="black_to_move">Black to move</string>
+    <string name="check">Check</string>
+    <string name="checkmate">Checkmate</string>
+    <string name="stalemate">Stalemate</string>
+    <string name="draw">Draw</string>
+    <string name="white_wins">White wins</string>
+    <string name="black_wins">Black wins</string>
+    
+    <!-- Engine Analysis -->
+    <string name="engine_thinking">Engine thinking...</string>
+    <string name="best_move">Best move</string>
+    <string name="evaluation">Evaluation</string>
+    <string name="depth">Depth</string>
+    <string name="nodes">Nodes</string>
+    <string name="time">Time</string>
+    <string name="mate_in_n">Mate in %1$d</string>
+    
+    <!-- Move History -->
+    <string name="move_history">Move History</string>
+    <string name="captured_pieces">Captured Pieces</string>
+    <string name="move_number">%1$d.</string>
+    
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="difficulty">Difficulty</string>
+    <string name="sound_effects">Sound Effects</string>
+    <string name="haptic_feedback">Haptic Feedback</string>
+    <string name="auto_promote_queen">Auto-promote to Queen</string>
+    <string name="show_legal_moves">Show Legal Moves</string>
+    <string name="board_theme">Board Theme</string>
+    <string name="piece_style">Piece Style</string>
+    
+    <!-- Errors -->
+    <string name="engine_error">Engine error occurred</string>
+    <string name="invalid_move">Invalid move</string>
+    <string name="engine_not_ready">Engine not ready</string>
+    <string name="connection_error">Connection error</string>
+    
+    <!-- Content Descriptions for Accessibility -->
+    <string name="chess_board">Chess board</string>
+    <string name="chess_square">Chess square %1$s</string>
+    <string name="chess_piece">%1$s %2$s on %3$s</string>
+    <string name="empty_square">Empty square %1$s</string>
+    <string name="possible_move">Possible move to %1$s</string>
+    <string name="last_move_from">Last move from %1$s</string>
+    <string name="last_move_to">Last move to %1$s</string>
+    <string name="king_in_check">King in check</string>
+    
+    <!-- Piece Names -->
+    <string name="piece_king">King</string>
+    <string name="piece_queen">Queen</string>
+    <string name="piece_rook">Rook</string>
+    <string name="piece_bishop">Bishop</string>
+    <string name="piece_knight">Knight</string>
+    <string name="piece_pawn">Pawn</string>
+    
+    <!-- Colors -->
+    <string name="color_white">White</string>
+    <string name="color_black">Black</string>
+    
+    <!-- Dialog Messages -->
+    <string name="game_over">Game Over</string>
+    <string name="start_new_game">Start New Game?</string>
+    <string name="confirm">Confirm</string>
+    <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    
+    <!-- Menu Items -->
+    <string name="menu_new_game">New Game</string>
+    <string name="menu_save_game">Save Game</string>
+    <string name="menu_load_game">Load Game</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_about">About</string>
+</resources>

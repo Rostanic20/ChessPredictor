@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <group android:translateX="24" android:translateY="24">
+        <!-- Chess piece - King -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,20c-12,0 -20,8 -20,20v20c0,4 2,6 6,6h28c4,0 6,-2 6,-6V40c0,-12 -8,-20 -20,-20z"/>
+        
+        <!-- King's crown -->
+        <path
+            android:fillColor="#FFD700"
+            android:pathData="M20,15h20v8h-20z"/>
+        <path
+            android:fillColor="#FFD700"
+            android:pathData="M24,10h12v8h-12z"/>
+        
+        <!-- Cross on crown -->
+        <path
+            android:fillColor="#FFD700"
+            android:pathData="M28,5h4v10h-4z"/>
+        <path
+            android:fillColor="#FFD700"
+            android:pathData="M25,8h10v4h-10z"/>
+            
+        <!-- King's base -->
+        <path
+            android:fillColor="#E0E0E0"
+            android:pathData="M15,50h30v10h-30z"/>
+    </group>
+</vector>

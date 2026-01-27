@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChessPredictor</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="engine-settings.css">
+    
+    <!-- Allow cross-origin workers for Stockfish -->
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="credentialless">
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    
+    <!-- Chess piece fonts fallback -->
+    <style>
+        @font-face {
+            font-family: 'Chess';
+            src: local('Chess'),
+                 local('DejaVu Sans'),
+                 local('Noto Sans Symbols'),
+                 local('Apple Symbols'),
+                 local('Segoe UI Symbol');
+        }
+        
+        .piece {
+            font-family: Chess, 'DejaVu Sans', 'Noto Sans Symbols', 'Apple Symbols', 'Segoe UI Symbol', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">
+            <h1>ChessPredictor</h1>
+            <p>Loading...</p>
+        </div>
+    </div>
+    
+    <script src="stockfish-loader.js"></script>
+    <script src="chesspredictor.js"></script>
+</body>
+</html>
