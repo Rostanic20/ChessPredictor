@@ -19,6 +19,13 @@ local.properties
 /kotlin-js-store
 node_modules/
 
+# iOS
+iosApp/Pods/
+iosApp/build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
 # IDE
 *.swp
 *~

@@ -13,17 +13,19 @@ A Kotlin Multiplatform chess application featuring an AI opponent powered by Sto
 - **Undo Support** - Take back moves when needed
 - **Dark Theme** - Modern UI design
 
-## Platformsg
+## Platforms
 
 | Platform | Status |
 |----------|--------|
 | Android  | Production Ready |
+| iOS      | Production Ready |
 | Web      | Production Ready |
 
 ## Tech Stack
 
 - **Kotlin Multiplatform** - Shared codebase across platforms
 - **Jetpack Compose** - Modern Android UI
+- **SwiftUI** - Native iOS UI with responsive iPad layout
 - **Stockfish 17.1** - World's strongest open-source chess engine
 - **Coroutines & StateFlow** - Reactive state management
 - **MVVM Architecture** - Clean separation of concerns
@@ -33,8 +35,10 @@ A Kotlin Multiplatform chess application featuring an AI opponent powered by Sto
 ### Prerequisites
 
 - Android Studio Arctic Fox or later
+- Xcode 15+ (for iOS)
 - JDK 11+
 - Android SDK 24+
+- CocoaPods (for iOS)
 
 ### Build Android
 
@@ -43,6 +47,16 @@ A Kotlin Multiplatform chess application featuring an AI opponent powered by Sto
 ```
 
 APK will be in `androidApp/build/outputs/apk/debug/`
+
+### Build iOS
+
+```bash
+cd iosApp
+pod install
+open iosApp.xcworkspace
+```
+
+Build and run from Xcode on a simulator or device.
 
 ### Build Web
 
@@ -59,12 +73,18 @@ ChessPredictor/
 ├── androidApp/                 # Android app module
 │   └── src/main/
 │       └── MainActivity.kt
+├── iosApp/                     # iOS app module (SwiftUI)
+│   └── iosApp/
+│       ├── ContentView.swift
+│       ├── Views/             # SwiftUI views
+│       └── ViewModels/        # ViewModel wrappers
 ├── shared/                     # Shared KMP module
 │   ├── commonMain/            # Cross-platform code
 │   │   ├── domain/            # Business logic
 │   │   ├── data/              # Repositories & data sources
 │   │   └── presentation/      # ViewModels & UI state
 │   ├── androidMain/           # Android implementations
+│   ├── iosMain/               # iOS implementations
 │   └── jsMain/                # Web implementations
 ├── build.gradle.kts
 └── settings.gradle.kts
