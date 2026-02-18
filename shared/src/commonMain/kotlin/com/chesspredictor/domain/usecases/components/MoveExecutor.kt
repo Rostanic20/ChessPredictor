@@ -60,9 +60,9 @@ class MoveExecutor {
             // En passant capture - remove the captured pawn
             move.piece is ChessPiece.Pawn && move.to == gameState.enPassantSquare -> {
                 val capturedPawnSquare = Square(move.to.file, move.from.rank)
-                val capturedPawn = newBoard.remove(capturedPawnSquare)
-                if (capturedPawn != null) {
-                    newCapturedPieces.add(capturedPawn)
+                val enPassantPawn = newBoard.remove(capturedPawnSquare)
+                if (enPassantPawn != null && capturedPiece == null) {
+                    newCapturedPieces.add(enPassantPawn)
                 }
             }
             

@@ -68,9 +68,8 @@ class AnimationManager {
     }
     
     private fun isEnPassant(move: ChessMove, gameState: GameState): Boolean {
-        return move.piece is ChessPiece.Pawn && 
-               move.to == gameState.enPassantSquare &&
-               move.capturedPiece == null
+        return move.piece is ChessPiece.Pawn &&
+               move.to == gameState.enPassantSquare
     }
     
     private fun createMainAnimation(move: ChessMove, moveType: MoveType): PieceAnimation {

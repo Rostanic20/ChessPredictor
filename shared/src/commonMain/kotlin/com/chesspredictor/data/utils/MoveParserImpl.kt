@@ -8,28 +8,29 @@ import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.utils.FenParser
 
 class MoveParserImpl : MoveParser {
+
+    private val fenParser = FenParser()
+
     override fun parseUciMove(uciMove: String, board: ChessBoard): ChessMove? {
         if (uciMove.length < 4) return null
-        
+
         try {
             val fromFile = uciMove[0]
             val fromRank = uciMove[1].digitToInt()
             val toFile = uciMove[2]
             val toRank = uciMove[3].digitToInt()
-            
+
             val from = Square(fromFile, fromRank)
             val to = Square(toFile, toRank)
-            
-            // Get piece at from square (simplified - would need actual board state)
-            val piece = getPieceAt(board, from) ?: return null
-            
-            // Validate that the piece color matches whose turn it is
-            val gameState = FenParser().parseGameState(board.fen)
+
+            val gameState = fenParser.parseGameState(board.fen)
+
+            val piece = gameState.board[from] ?: return null
+
             if (piece.color != gameState.turn) {
                 return null
             }
-            
-            // Check for promotion
+
             val promotion = if (uciMove.length == 5) {
                 when (uciMove[4]) {
                     'q' -> ChessPiece.Queen(piece.color)
@@ -39,10 +40,9 @@ class MoveParserImpl : MoveParser {
                     else -> null
                 }
             } else null
-            
-            // Get captured piece if any
-            val capturedPiece = getPieceAt(board, to)
-            
+
+            val capturedPiece = gameState.board[to]
+
             return ChessMove(
                 from = from,
                 to = to,
@@ -54,7 +54,7 @@ class MoveParserImpl : MoveParser {
             return null
         }
     }
-    
+
     override fun toUciMove(move: ChessMove): String {
         val base = "${move.from}${move.to}"
         return when (move.promotion) {
@@ -64,11 +64,5 @@ class MoveParserImpl : MoveParser {
             is ChessPiece.Knight -> "${base}n"
             else -> base
         }
-    }
-    
-    private fun getPieceAt(board: ChessBoard, square: Square): ChessPiece? {
-        val fenParser = FenParser()
-        val gameState = fenParser.parseGameState(board.fen)
-        return gameState.board[square]
     }
 }

@@ -56,11 +56,18 @@ class MoveController(
             null
         }
 
+        val capturedPiece = gameState.board[to]
+            ?: if (piece is ChessPiece.Pawn && to == gameState.enPassantSquare) {
+                gameState.board[Square(to.file, from.rank)]
+            } else {
+                null
+            }
+
         val move = ChessMove(
             from = from,
             to = to,
             piece = piece,
-            capturedPiece = gameState.board[to],
+            capturedPiece = capturedPiece,
             promotion = promotion
         )
 

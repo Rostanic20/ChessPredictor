@@ -3,9 +3,15 @@ package com.chesspredictor.domain.usecases.components
 import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.GameState
+import com.chesspredictor.domain.entities.Square
 
 class DrawDetector {
-    
+
+    companion object {
+        private const val THREEFOLD_REPETITION_THRESHOLD = 2
+        private const val FIFTY_MOVE_HALF_CLOCK = 100
+    }
+
     fun isDraw(gameState: GameState): Boolean {
         return isThreefoldRepetition(gameState) || 
                isFiftyMoveRule(gameState) || 
@@ -17,43 +23,44 @@ class DrawDetector {
         val occurrences = gameState.positionHistory.count { position ->
             position.split(" ").take(4).joinToString(" ") == currentPosition
         }
-        return occurrences >= 2 // Current position + 2 previous = 3 total
+        return occurrences >= THREEFOLD_REPETITION_THRESHOLD
     }
     
     fun isFiftyMoveRule(gameState: GameState): Boolean {
-        return gameState.halfMoveClock >= 100 // 50 moves by each player = 100 half-moves
+        return gameState.halfMoveClock >= FIFTY_MOVE_HALF_CLOCK
     }
     
     fun isInsufficientMaterial(gameState: GameState): Boolean {
-        val pieces = gameState.board.values.groupBy { it.color }
-        val whitePieces = pieces[ChessColor.WHITE] ?: emptyList()
-        val blackPieces = pieces[ChessColor.BLACK] ?: emptyList()
-        
-        // Both sides must have insufficient material
+        val piecesBySquare = gameState.board
+        val whitePieces = piecesBySquare.filter { it.value.color == ChessColor.WHITE }
+        val blackPieces = piecesBySquare.filter { it.value.color == ChessColor.BLACK }
+
         return hasInsufficientMaterial(whitePieces) && hasInsufficientMaterial(blackPieces)
     }
-    
-    private fun hasInsufficientMaterial(pieces: List<ChessPiece>): Boolean {
-        // Remove kings from consideration
-        val nonKingPieces = pieces.filterNot { it is ChessPiece.King }
-        
+
+    private fun hasInsufficientMaterial(pieces: Map<Square, ChessPiece>): Boolean {
+        val nonKingPieces = pieces.filter { it.value !is ChessPiece.King }
+
         return when (nonKingPieces.size) {
-            0 -> true // King only
+            0 -> true
             1 -> {
-                val piece = nonKingPieces.first()
+                val piece = nonKingPieces.values.first()
                 piece is ChessPiece.Bishop || piece is ChessPiece.Knight
             }
             2 -> {
-                // Two bishops of same color
-                val bishops = nonKingPieces.filterIsInstance<ChessPiece.Bishop>()
+                val bishops = nonKingPieces.filter { it.value is ChessPiece.Bishop }
                 if (bishops.size == 2) {
-                    // This is a simplification - in reality we'd need to check square colors
-                    true
+                    val squares = bishops.keys.toList()
+                    isLightSquare(squares[0]) == isLightSquare(squares[1])
                 } else {
                     false
                 }
             }
             else -> false
         }
+    }
+
+    private fun isLightSquare(square: Square): Boolean {
+        return (square.file.code + square.rank) % 2 != 0
     }
 }

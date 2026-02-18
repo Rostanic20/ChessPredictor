@@ -4,8 +4,7 @@ import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.GameState
 
 class MoveValidator(
-    private val moveGenerator: MoveGenerator,
-    @Suppress("UNUSED_PARAMETER") checkDetector: CheckDetector
+    private val moveGenerator: MoveGenerator
 ) {
 
     fun isMoveLegal(gameState: GameState, move: ChessMove): Boolean {

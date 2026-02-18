@@ -6,8 +6,7 @@ import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.opposite
 
 class CheckDetector(
-    private val moveGenerator: MoveGenerator,
-    @Suppress("UNUSED_PARAMETER") private val moveExecutor: MoveExecutor
+    private val moveGenerator: MoveGenerator
 ) {
 
     fun isInCheck(gameState: GameState, color: ChessColor): Boolean {

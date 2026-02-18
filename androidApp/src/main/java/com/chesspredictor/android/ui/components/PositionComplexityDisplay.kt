@@ -24,8 +24,8 @@ import com.chesspredictor.domain.entities.*
 fun PositionComplexityCard(
     complexity: PositionComplexity,
     modifier: Modifier = Modifier,
-    expanded: Boolean = false,
-    onExpandToggle: () -> Unit = {}
+    @Suppress("UNUSED_PARAMETER") expanded: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") onExpandToggle: () -> Unit = {}
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),

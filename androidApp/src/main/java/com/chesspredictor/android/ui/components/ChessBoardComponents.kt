@@ -229,10 +229,10 @@ private fun ChessBoardGrid(
                 }
         ) {
             val ranks = if (uiState.isFlipped) 1..8 else (8 downTo 1)
-            ranks.forEachIndexed { rankIndex, rank ->
+            ranks.forEachIndexed { _, rank ->
                 Row(modifier = Modifier.weight(1f)) {
                     val files = if (uiState.isFlipped) ('h' downTo 'a') else ('a'..'h')
-                    files.forEachIndexed { fileIndex, file ->
+                    files.forEachIndexed { _, file ->
                         val square = Square(file, rank)
                         val isAnimatingFrom = square in uiState.animatingPieces
                         val piece = if (isAnimatingFrom) null else uiState.boardState[square]

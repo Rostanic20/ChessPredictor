@@ -38,6 +38,12 @@ class EngineManager(
 
         private const val BLUNDER_COMPLEXITY_FACTOR = 0.3f
         private const val INACCURACY_COMPLEXITY_FACTOR = 0.2f
+
+        private const val PAWN_VALUE = 1
+        private const val KNIGHT_VALUE = 3
+        private const val BISHOP_VALUE = 3
+        private const val ROOK_VALUE = 5
+        private const val QUEEN_VALUE = 9
     }
     
     private val _isThinking = MutableStateFlow(false)
@@ -165,6 +171,8 @@ class EngineManager(
                 _isThinking.value = false
             } catch (e: Exception) {
                 _isThinking.value = false
+                _error.value = EngineError.ANALYSIS_FAILED(e.message ?: "Unknown error")
+                ChessLogger.error(TAG, "Engine move request failed", e)
             }
         }
     }
@@ -298,26 +306,25 @@ class EngineManager(
     }
     
     private fun calculateMaterialBalance(board: ChessBoard): Int {
-        val pieceValues = mapOf(
-            'p' to 1, 'P' to -1,
-            'n' to 3, 'N' to -3,
-            'b' to 3, 'B' to -3,
-            'r' to 5, 'R' to -5,
-            'q' to 9, 'Q' to -9
-        )
-        
         var balance = 0
-        for (char in board.fen) {
-            if (char in pieceValues) {
-                balance += if (board.turn == ChessColor.WHITE) {
-                    pieceValues[char] ?: 0
-                } else {
-                    -(pieceValues[char] ?: 0)
-                }
+        val boardPart = board.fen.substringBefore(' ')
+        for (char in boardPart) {
+            val value = when (char) {
+                'P' -> PAWN_VALUE
+                'N' -> KNIGHT_VALUE
+                'B' -> BISHOP_VALUE
+                'R' -> ROOK_VALUE
+                'Q' -> QUEEN_VALUE
+                'p' -> -PAWN_VALUE
+                'n' -> -KNIGHT_VALUE
+                'b' -> -BISHOP_VALUE
+                'r' -> -ROOK_VALUE
+                'q' -> -QUEEN_VALUE
+                else -> 0
             }
+            balance += value
         }
-        
-        return balance
+        return if (board.turn == ChessColor.WHITE) -balance else balance
     }
 }
 

@@ -15,12 +15,14 @@ import com.chesspredictor.domain.entities.PopularMove
 import com.chesspredictor.domain.entities.Square
 
 class OpeningDetector {
-    
-    // Use the advanced database
+
+    companion object {
+        private const val MAX_CACHE_SIZE = 256
+    }
+
     private val openingDatabase = AdvancedOpeningDatabase.openingDatabase
-    
-    // Cache for position transpositions  
-    private val transpositionCache = mutableMapOf<String, ChessOpening>()
+
+    private val transpositionCache = LinkedHashMap<String, ChessOpening>(MAX_CACHE_SIZE, 0.75f, true)
     
     // ECO code hierarchy for parent-child relationships
     private val ecoHierarchy = mapOf(
@@ -50,18 +52,16 @@ class OpeningDetector {
         transpositionCache[positionKey]?.let { cachedOpening ->
             return createOpeningInfo(cachedOpening, sanMoves, true)
         }
-        
-        // Primary detection: exact move sequence matching
+
         val primaryResult = detectPrimaryOpening(sanMoves)
         if (primaryResult.opening != null) {
-            transpositionCache[positionKey] = primaryResult.opening
+            putCache(positionKey, primaryResult.opening)
             return primaryResult
         }
-        
-        // Secondary detection: transposition checking
+
         val transpositionResult = detectTranspositions(sanMoves)
         if (transpositionResult.opening != null) {
-            transpositionCache[positionKey] = transpositionResult.opening
+            putCache(positionKey, transpositionResult.opening)
             return transpositionResult
         }
         
@@ -69,15 +69,23 @@ class OpeningDetector {
         return detectPartialMatch(sanMoves)
     }
     
+    private fun putCache(key: String, opening: ChessOpening) {
+        if (transpositionCache.size >= MAX_CACHE_SIZE) {
+            val eldest = transpositionCache.keys.first()
+            transpositionCache.remove(eldest)
+        }
+        transpositionCache[key] = opening
+    }
+
     private fun detectPrimaryOpening(sanMoves: List<String>): OpeningInfo {
-        // Sort by specificity: longer sequences first, then by popularity
+        if (openingDatabase.isEmpty()) return OpeningInfo(null)
+
         val sortedOpenings = openingDatabase.sortedWith(
             compareByDescending<ChessOpening> { it.moves.size }
                 .thenByDescending { it.popularity }
                 .thenBy { if (it.isMainLine) 0 else 1 }
         )
-        
-        // Find exact matches first
+
         for (opening in sortedOpenings) {
             val matchLength = getMatchingMoveCount(sanMoves, opening.moves)
             if (matchLength == opening.moves.size && matchLength >= 2) {
@@ -144,7 +152,7 @@ class OpeningDetector {
             transposition = isTransposition,
             nextPopularMoves = getNextPopularMoves(opening, sanMoves),
             positionEvaluation = calculatePositionEvaluation(opening, sanMoves.size),
-            variation = determineVariation(opening, sanMoves, moveNumber)
+            variation = determineVariation(opening, moveNumber)
         )
     }
     
@@ -185,11 +193,11 @@ class OpeningDetector {
         }
         
         // Find continuations from other openings that start with this one
-        val continuations = findContinuations(opening, currentMoves)
-        return continuations.take(3)  // Top 3 popular continuations
+        val continuations = findContinuations(currentMoves)
+        return continuations.take(3)
     }
-    
-    private fun findContinuations(opening: ChessOpening, currentMoves: List<String>): List<PopularMove> {
+
+    private fun findContinuations(currentMoves: List<String>): List<PopularMove> {
         val continuations = mutableListOf<PopularMove>()
         
         // Look for openings that extend this one
@@ -231,7 +239,7 @@ class OpeningDetector {
         return baseEval * phaseAdjustment
     }
     
-    private fun determineVariation(opening: ChessOpening, sanMoves: List<String>, moveNumber: Int): String? {
+    private fun determineVariation(opening: ChessOpening, moveNumber: Int): String? {
         return when {
             moveNumber == opening.moves.size -> null  // Exact match
             moveNumber < opening.moves.size -> "In progress"

@@ -56,11 +56,10 @@ class HumanBehaviorManager(
     fun calculateDisplayThinkingTime(
         profile: HumanBehaviorProfile,
         position: ChessBoard,
-        actualEngineTime: Long,
+        @Suppress("UNUSED_PARAMETER") actualEngineTime: Long,
         timeControl: GameTimeControl = GameTimeControl.CLASSICAL
     ): Long {
         val complexity = estimatePositionComplexity(position)
-        val currentEval = gameHistory.lastOrNull() ?: 0f
 
         val (baseTime, maxTime) = when (timeControl) {
             GameTimeControl.BULLET -> BULLET_BASE_TIME to BULLET_MAX_TIME
@@ -120,7 +119,7 @@ class HumanBehaviorManager(
     fun updateEmotionalState(
         profile: HumanBehaviorProfile,
         position: ChessBoard,
-        lastMove: ChessMove?,
+        @Suppress("UNUSED_PARAMETER") lastMove: ChessMove?,
         evaluation: Float
     ) {
         gameHistory.add(evaluation)
@@ -223,7 +222,7 @@ class HumanBehaviorManager(
         _isShowingThoughts.value = false
     }
 
-    private fun generateTacticalExplanation(move: ChessMove, position: ChessBoard): String {
+    private fun generateTacticalExplanation(move: ChessMove, @Suppress("UNUSED_PARAMETER") position: ChessBoard): String {
         val explanations = listOf(
             "I see a tactical opportunity here with ${move.piece}",
             "This move creates some threats I want to explore",
@@ -250,7 +249,7 @@ class HumanBehaviorManager(
         }
     }
     
-    private fun generateStrategicComment(move: ChessMove, position: ChessBoard, profile: HumanBehaviorProfile): String {
+    private fun generateStrategicComment(@Suppress("UNUSED_PARAMETER") move: ChessMove, @Suppress("UNUSED_PARAMETER") position: ChessBoard, profile: HumanBehaviorProfile): String {
         val style = if (profile.tacticalAggression > 0.6f) {
             listOf("Looking for active play", "Keeping the initiative", "Staying aggressive")
         } else {

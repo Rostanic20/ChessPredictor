@@ -91,7 +91,7 @@ inline fun <T> ErrorStateManager.safeExecute(
  */
 suspend inline fun <T> ErrorStateManager.safeExecuteSuspend(
     errorFactory: (Throwable) -> ChessError = { ChessError.UnknownError(cause = it) },
-    block: suspend () -> T
+    block: () -> T
 ): T? {
     return try {
         block()

@@ -9,6 +9,7 @@ import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.domain.repositories.PositionAnalysis
 import com.chesspredictor.domain.usecases.SimpleOpeningBook
+import com.chesspredictor.utils.ChessLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -16,13 +17,25 @@ class ChessEngineRepositoryImpl(
     private val engineDataSource: ChessEngineDataSource,
     private val moveParser: MoveParser
 ) : ChessEngineRepository {
-    
+
+    companion object {
+        private const val TAG = "ChessEngineRepository"
+    }
+
     private val openingBook = SimpleOpeningBook()
     
     override suspend fun analyzeBestMove(
         board: ChessBoard,
         settings: EngineSettings
     ): ChessMove? {
+        if (settings.useBook && board.moveHistory.size < 15) {
+            val bookMove = openingBook.getBookMove(board.fen, settings.skillLevel)
+            if (bookMove != null) {
+                val move = moveParser.parseUciMove(bookMove, board)
+                if (move != null) return move
+            }
+        }
+
         engineDataSource.setPosition(board.fen)
         val analysis = engineDataSource.analyze(settings)
         return analysis.bestMove.takeIf { it.isNotEmpty() }?.let {
@@ -80,13 +93,14 @@ class ChessEngineRepositoryImpl(
         val bestMove = if (analysis.bestMove.isNotEmpty()) {
             val parsedMove = moveParser.parseUciMove(analysis.bestMove, board)
             if (parsedMove == null) {
-                // Silently handle move parsing failures
-                null // Allow analysis to continue with null bestMove
+                ChessLogger.warning(TAG, "Failed to parse best move: ${analysis.bestMove}")
+                null
             } else {
                 parsedMove
             }
         } else {
-            null // Allow analysis to continue with null bestMove
+            ChessLogger.warning(TAG, "Engine returned empty best move")
+            null
         }
         
         // Parse evaluation score (already in pawns from StockfishDataSource)
@@ -97,6 +111,7 @@ class ChessEngineRepositoryImpl(
         )
         
         if (bestMove == null) {
+            ChessLogger.warning(TAG, "No valid best move available for position: ${board.fen}")
             return null
         }
         

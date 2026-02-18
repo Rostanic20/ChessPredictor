@@ -18,8 +18,8 @@ class ChessRulesEngine {
     private val fenParser = FenParser()
     private val moveGenerator = MoveGenerator()
     private val moveExecutor = MoveExecutor()
-    private val checkDetector = CheckDetector(moveGenerator, moveExecutor)
-    private val moveValidator = MoveValidator(moveGenerator, checkDetector)
+    private val checkDetector = CheckDetector(moveGenerator)
+    private val moveValidator = MoveValidator(moveGenerator)
     private val drawDetector = DrawDetector()
     private val sanGenerator = SANGenerator(moveGenerator, checkDetector)
     
