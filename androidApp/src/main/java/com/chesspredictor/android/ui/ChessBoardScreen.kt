@@ -36,7 +36,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.chesspredictor.android.ui.components.*
 import com.chesspredictor.domain.entities.*
 import com.chesspredictor.presentation.viewmodels.ChessBoardViewModel
@@ -125,22 +124,7 @@ private fun ChessAppBar(
     onExport: () -> Unit = {}
 ) {
     TopAppBar(
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "Chess",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Predictor",
-                    fontWeight = FontWeight.Light,
-                    fontSize = 24.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
+        title = {},
         actions = {
             IconButton(onClick = onUndo) {
                 Icon(

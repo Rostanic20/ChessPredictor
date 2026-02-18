@@ -4,32 +4,31 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
-    <group android:translateX="24" android:translateY="24">
-        <!-- Chess piece - King -->
+
+    <group android:translateX="20" android:translateY="14">
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M30,20c-12,0 -20,8 -20,20v20c0,4 2,6 6,6h28c4,0 6,-2 6,-6V40c0,-12 -8,-20 -20,-20z"/>
-        
-        <!-- King's crown -->
+            android:pathData="M 19,56 L 49,56 L 47,50 L 21,50 Z"/>
         <path
-            android:fillColor="#FFD700"
-            android:pathData="M20,15h20v8h-20z"/>
+            android:fillColor="#E6E6E6"
+            android:pathData="M 22,50 L 46,50 L 45,48 L 23,48 Z"/>
         <path
-            android:fillColor="#FFD700"
-            android:pathData="M24,10h12v8h-12z"/>
-        
-        <!-- Cross on crown -->
+            android:fillColor="#FFFFFF"
+            android:pathData="M 24,48 L 24,30 L 25.5,25 L 28,20 L 31,16 L 35,13 L 39,12 L 43,13 L 46,15 L 48,18 L 49,22 L 49,28 L 47,34 L 45,40 L 44,48 Z"/>
         <path
-            android:fillColor="#FFD700"
-            android:pathData="M28,5h4v10h-4z"/>
+            android:fillColor="#FFFFFF"
+            android:pathData="M 28,20 L 23,15 L 19,10 L 16,6 L 14.5,3 L 15,1 L 17,0 L 20,1 L 23,3 L 26,6 L 28.5,4 L 31.5,2 L 34.5,2 L 38,3 L 41,5 L 43,8 L 45,11 L 46,15 L 43,13 L 39,12 L 35,13 L 31,16 Z"/>
         <path
-            android:fillColor="#FFD700"
-            android:pathData="M25,8h10v4h-10z"/>
-            
-        <!-- King's base -->
+            android:fillColor="#FFFFFF"
+            android:pathData="M 26,6 L 24,0 L 27,2 L 28.5,4 Z"/>
         <path
-            android:fillColor="#E0E0E0"
-            android:pathData="M15,50h30v10h-30z"/>
+            android:fillColor="#FFFFFF"
+            android:pathData="M 28.5,4 L 30,-1 L 33,1 L 31.5,2 Z"/>
+        <path
+            android:fillColor="#1E88E5"
+            android:pathData="M 39,9 A 2.5,2.5 0 1,1 39.001,9 Z"/>
+        <path
+            android:fillColor="#CCCCCC"
+            android:pathData="M 17,6 A 1.5,1.5 0 1,1 17.001,6 Z"/>
     </group>
 </vector>

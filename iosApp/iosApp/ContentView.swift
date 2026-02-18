@@ -3,31 +3,16 @@ import shared
 
 struct ContentView: View {
     @StateObject private var viewModel = ChessBoardViewModelWrapper()
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         NavigationStack {
             ZStack {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        GameStatusView(viewModel: viewModel)
-
-                        ChessBoardCard(viewModel: viewModel)
-
-                        if !viewModel.moveHistory.isEmpty {
-                            MoveHistoryView(viewModel: viewModel)
-                        }
-
-                        PlayModeSelector(viewModel: viewModel)
-
-                        if viewModel.playMode == .vsEngine {
-                            PlayerColorSelector(viewModel: viewModel)
-                        }
-
-                        DifficultySelector(viewModel: viewModel)
-                    }
-                    .padding(16)
+                if horizontalSizeClass == .regular {
+                    WideLayout(viewModel: viewModel)
+                } else {
+                    CompactLayout(viewModel: viewModel)
                 }
-                .background(Color(.systemGroupedBackground))
 
                 if viewModel.showPromotionDialog {
                     Color.black.opacity(0.4)
@@ -39,17 +24,6 @@ struct ContentView: View {
             }
             .navigationTitle("")
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 4) {
-                        Text("Chess")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("Predictor")
-                            .font(.title2)
-                            .fontWeight(.light)
-                            .foregroundColor(.accentColor)
-                    }
-                }
                 ToolbarItemGroup(placement: .navigationBarLeading) {
                     Button(action: { viewModel.undoLastMove() }) {
                         Image(systemName: "arrow.uturn.backward")
@@ -91,6 +65,75 @@ struct ContentView: View {
                 ImportGameView(viewModel: viewModel)
             }
         }
+    }
+}
+
+struct CompactLayout: View {
+    @ObservedObject var viewModel: ChessBoardViewModelWrapper
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                GameStatusView(viewModel: viewModel)
+
+                ChessBoardCard(viewModel: viewModel)
+
+                if !viewModel.moveHistory.isEmpty {
+                    MoveHistoryView(viewModel: viewModel)
+                }
+
+                PlayModeSelector(viewModel: viewModel)
+
+                if viewModel.playMode == .vsEngine {
+                    PlayerColorSelector(viewModel: viewModel)
+                }
+
+                DifficultySelector(viewModel: viewModel)
+            }
+            .padding(16)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+struct WideLayout: View {
+    @ObservedObject var viewModel: ChessBoardViewModelWrapper
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(spacing: 12) {
+                if viewModel.isCheckmate || viewModel.isStalemate || viewModel.isDraw {
+                    GameStatusView(viewModel: viewModel)
+                }
+
+                ChessBoardCard(viewModel: viewModel)
+                    .frame(maxWidth: 500)
+            }
+            .frame(maxHeight: .infinity)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    if !viewModel.isCheckmate && !viewModel.isStalemate && !viewModel.isDraw {
+                        GameStatusView(viewModel: viewModel)
+                    }
+
+                    if !viewModel.moveHistory.isEmpty {
+                        MoveHistoryView(viewModel: viewModel)
+                    }
+
+                    PlayModeSelector(viewModel: viewModel)
+
+                    if viewModel.playMode == .vsEngine {
+                        PlayerColorSelector(viewModel: viewModel)
+                    }
+
+                    DifficultySelector(viewModel: viewModel)
+                }
+                .padding(.vertical, 16)
+            }
+        }
+        .padding(.horizontal, 16)
+        .background(Color(.systemGroupedBackground))
     }
 }
 

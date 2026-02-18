@@ -1,25 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Light theme -->
     <style name="Theme.ChessPredictor" parent="android:Theme.Material.Light.NoActionBar">
-        <!-- Primary colors -->
         <item name="android:colorPrimary">@color/chess_primary</item>
         <item name="android:colorPrimaryDark">@color/chess_on_primary_container</item>
         <item name="android:colorAccent">@color/chess_secondary</item>
-        
-        <!-- Background colors -->
         <item name="android:windowBackground">@color/chess_surface</item>
         <item name="android:colorBackground">@color/chess_surface</item>
-        
-        <!-- Status bar -->
         <item name="android:statusBarColor">@color/chess_primary</item>
         <item name="android:windowLightStatusBar">false</item>
-        
-        <!-- Remove action bar -->
         <item name="android:windowNoTitle">true</item>
     </style>
-    
-    <!-- Dark theme -->
+
+    <style name="Theme.ChessPredictor.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#1A1A24</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.ChessPredictor</item>
+    </style>
+
     <style name="Theme.ChessPredictor.Dark" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/chess_primary</item>
         <item name="android:colorPrimaryDark">@color/chess_on_primary_container</item>
