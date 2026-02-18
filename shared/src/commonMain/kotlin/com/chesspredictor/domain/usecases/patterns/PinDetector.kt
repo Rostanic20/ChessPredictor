@@ -7,14 +7,6 @@ import com.chesspredictor.domain.entities.PatternType
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TacticalPattern
 
-/**
- * Detects pin patterns where a piece is pinned to a more valuable piece.
- * 
- * A pin occurs when:
- * - A sliding piece (bishop, rook, queen) attacks along a line
- * - An enemy piece is on that line
- * - A more valuable enemy piece is behind it on the same line
- */
 class PinDetector : PatternDetector {
     
     override fun detect(gameState: GameState): List<TacticalPattern> {
@@ -62,13 +54,11 @@ class PinDetector : PatternDetector {
             gameState.board[sq]?.let { sq to it } 
         }
         
-        // A pin requires exactly 2 pieces in the line
         if (piecesInLine.size != 2) return null
         
         val (pinnedSquare, pinnedPiece) = piecesInLine[0]
         val (valuableSquare, valuablePiece) = piecesInLine[1]
         
-        // Check if it's a valid pin configuration
         if (!isValidPin(attacker, pinnedPiece, valuablePiece)) return null
         
         return createPinPattern(
@@ -120,7 +110,7 @@ class PinDetector : PatternDetector {
     
     private fun calculatePinValue(pinnedPiece: ChessPiece, valuablePiece: ChessPiece): Int {
         return if (valuablePiece is ChessPiece.King) {
-            BoardUtils.getPieceValue(pinnedPiece) // Can win the pinned piece
+            BoardUtils.getPieceValue(pinnedPiece)
         } else {
             minOf(
                 BoardUtils.getPieceValue(pinnedPiece), 

@@ -53,10 +53,6 @@ fun ChessBoardScreen(
     val isEngineReady by viewModel.isEngineReady.collectAsState()
     val currentOpening by viewModel.currentOpening.collectAsState()
     
-    // Human behavior state
-    val currentEmotionalState by viewModel.currentEmotionalState.collectAsState()
-    val lastCommentary by viewModel.lastCommentary.collectAsState()
-    val isShowingThoughts by viewModel.isShowingThoughts.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
@@ -67,7 +63,6 @@ fun ChessBoardScreen(
         viewModel.initializeBoard()
     }
     
-    // Dialogs
     if (uiState.showNewGameDialog) {
         NewGameConfirmationDialog(
             onConfirm = viewModel::confirmNewGame,
@@ -110,9 +105,6 @@ fun ChessBoardScreen(
             isEngineReady = isEngineReady,
             currentOpening = currentOpening,
             isLandscape = isLandscape,
-            currentEmotionalState = currentEmotionalState,
-            lastCommentary = lastCommentary,
-            isShowingThoughts = isShowingThoughts,
             onSquareClick = viewModel::onSquareClick,
             onPlayModeChange = viewModel::setPlayMode,
             onPlayerColorChange = viewModel::setPlayerColor,
@@ -176,7 +168,6 @@ private fun ChessAppBar(
                 )
             }
             
-            // More options menu
             var showMenu by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { showMenu = true }) {
@@ -241,9 +232,6 @@ private fun ChessGameContent(
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
     isLandscape: Boolean,
-    currentEmotionalState: EmotionalState,
-    lastCommentary: MoveCommentary?,
-    isShowingThoughts: Boolean,
     onSquareClick: (Square) -> Unit,
     onPlayModeChange: (PlayMode) -> Unit,
     onPlayerColorChange: (PlayerColor) -> Unit,
@@ -261,9 +249,6 @@ private fun ChessGameContent(
                 isThinking = isThinking,
                 isEngineReady = isEngineReady,
                 currentOpening = currentOpening,
-                currentEmotionalState = currentEmotionalState,
-                lastCommentary = lastCommentary,
-                isShowingThoughts = isShowingThoughts,
                 onSquareClick = onSquareClick,
                 onPlayModeChange = onPlayModeChange,
                 onPlayerColorChange = onPlayerColorChange,
@@ -275,9 +260,6 @@ private fun ChessGameContent(
                 isThinking = isThinking,
                 isEngineReady = isEngineReady,
                 currentOpening = currentOpening,
-                currentEmotionalState = currentEmotionalState,
-                lastCommentary = lastCommentary,
-                isShowingThoughts = isShowingThoughts,
                 onSquareClick = onSquareClick,
                 onPlayModeChange = onPlayModeChange,
                 onPlayerColorChange = onPlayerColorChange,
@@ -293,9 +275,6 @@ private fun LandscapeLayout(
     isThinking: Boolean,
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
-    currentEmotionalState: EmotionalState,
-    lastCommentary: MoveCommentary?,
-    isShowingThoughts: Boolean,
     onSquareClick: (Square) -> Unit,
     onPlayModeChange: (PlayMode) -> Unit,
     onPlayerColorChange: (PlayerColor) -> Unit,
@@ -307,7 +286,6 @@ private fun LandscapeLayout(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Chess board section
         Box(
             modifier = Modifier
                 .weight(1.2f)
@@ -318,7 +296,6 @@ private fun LandscapeLayout(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Status card above board if game ended
                 if (uiState.isCheckmate || uiState.isStalemate || uiState.isDraw) {
                     GameStatusCard(
                         uiState = uiState,
@@ -336,7 +313,6 @@ private fun LandscapeLayout(
                     modifier = Modifier.aspectRatio(1f)
                 )
                 
-                // Captured pieces below board
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -356,7 +332,6 @@ private fun LandscapeLayout(
             }
         }
         
-        // Right panel
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -364,7 +339,6 @@ private fun LandscapeLayout(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Game status if not ended
             if (!uiState.isCheckmate && !uiState.isStalemate && !uiState.isDraw) {
                 GameStatusCard(
                     uiState = uiState,
@@ -375,7 +349,6 @@ private fun LandscapeLayout(
             
             
             
-            // Move history
             if (uiState.moveHistory.isNotEmpty()) {
                 MoveHistoryDisplay(
                     moveHistory = uiState.moveHistory,
@@ -386,15 +359,6 @@ private fun LandscapeLayout(
                 )
             }
             
-            // Human behavior panel
-            HumanBehaviorPanel(
-                emotionalState = currentEmotionalState,
-                commentary = lastCommentary,
-                isShowingThoughts = isShowingThoughts,
-                modifier = Modifier.fillMaxWidth()
-            )
-            
-            // Controls at bottom
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PlayModeSelector(
                     currentMode = uiState.playMode,
@@ -423,9 +387,6 @@ private fun PortraitLayout(
     isThinking: Boolean,
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
-    currentEmotionalState: EmotionalState,
-    lastCommentary: MoveCommentary?,
-    isShowingThoughts: Boolean,
     onSquareClick: (Square) -> Unit,
     onPlayModeChange: (PlayMode) -> Unit,
     onPlayerColorChange: (PlayerColor) -> Unit,
@@ -439,14 +400,12 @@ private fun PortraitLayout(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Game status
         GameStatusCard(
             uiState = uiState,
             isThinking = isThinking,
             isEngineReady = isEngineReady
         )
         
-        // Chess board with captured pieces
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
@@ -496,15 +455,6 @@ private fun PortraitLayout(
             )
         }
         
-        // Human behavior panel
-        HumanBehaviorPanel(
-            emotionalState = currentEmotionalState,
-            commentary = lastCommentary,
-            isShowingThoughts = isShowingThoughts,
-            modifier = Modifier.fillMaxWidth()
-        )
-        
-        // Game controls
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PlayModeSelector(
                 currentMode = uiState.playMode,
@@ -606,7 +556,6 @@ fun EngineEvaluationDisplay(
                 )
             }
             
-            // Evaluation bar
             Spacer(modifier = Modifier.height(8.dp))
             Box(
                 modifier = Modifier
@@ -910,7 +859,6 @@ fun ChessBoardScreenWithAnalysis(
     Box(modifier = Modifier.fillMaxSize()) {
         ChessBoardScreen(viewModel = viewModel)
         
-        // Floating Action Button for Analysis
         if (uiState.moveHistory.isNotEmpty()) {
             FloatingActionButton(
                 onClick = onNavigateToAnalysis,

@@ -1,24 +1,24 @@
 package com.chesspredictor.domain.entities
 
 enum class MoveQuality {
-    BRILLIANT,      // ♦ (Brilliant sacrifice/tactical shot)
-    GREAT,          // ! (Great move, significantly better than alternatives)
-    GOOD,           // No symbol (Solid, reasonable move)
-    INACCURACY,     // ?! (Slight mistake, small evaluation loss)
-    MISTAKE,        // ?? (Clear mistake, significant evaluation loss)
-    BLUNDER         // ??? (Major blunder, game-changing mistake)
+    BRILLIANT,
+    GREAT,
+    GOOD,
+    INACCURACY,
+    MISTAKE,
+    BLUNDER
 }
 
 data class MoveAnalysis(
     val move: ChessMove,
     val quality: MoveQuality,
-    val evaluationBefore: Float,  // Position eval before the move
-    val evaluationAfter: Float,   // Position eval after the move
-    val centipawnLoss: Int,       // How much eval was lost/gained
-    val bestMove: String? = null, // What the engine thought was best
+    val evaluationBefore: Float,
+    val evaluationAfter: Float,
+    val centipawnLoss: Int,
+    val bestMove: String? = null,
     val alternativeMoves: List<String> = emptyList(),
-    val tacticalThemes: List<String> = emptyList(), // "Pin", "Fork", etc.
-    val comment: String = ""      // Human-readable explanation
+    val tacticalThemes: List<String> = emptyList(),
+    val comment: String = ""
 )
 
 data class GameAnalysis(
@@ -32,7 +32,7 @@ data class GameAnalysis(
 )
 
 data class PlayerAccuracy(
-    val white: Float = 0f,  // Accuracy percentage (0-100)
+    val white: Float = 0f,
     val black: Float = 0f
 )
 
@@ -52,9 +52,9 @@ enum class KeyMomentType {
 }
 
 enum class GamePhase {
-    OPENING,     // First 10-15 moves
-    MIDDLEGAME,  // Main battle
-    ENDGAME      // Few pieces left
+    OPENING,
+    MIDDLEGAME,
+    ENDGAME
 }
 
 enum class GameResult {

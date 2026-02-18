@@ -26,7 +26,6 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         withContext(Dispatchers.Main) {
             try {
                 
-                // Enable WebView debugging
                 WebView.setWebContentsDebuggingEnabled(true)
                 
                 webView = WebView(context).apply {
@@ -88,7 +87,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize Stockfish", e)
                 isInitialized = false
-                throw e // Re-throw to prevent engine from being marked as ready
+                throw e
             }
         }
     }
@@ -128,9 +127,9 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
     override suspend fun setPosition(fen: String) {
         Log.d(TAG, "Setting position: $fen")
         sendCommand("position fen $fen")
-        delay(200) // Give engine more time to process position change
-        sendCommand("isready") // Ensure engine is ready after position change
-        delay(100) // Wait for readyok response
+        delay(200)
+        sendCommand("isready")
+        delay(100)
         Log.d(TAG, "Position set, proceeding with analysis")
     }
     
@@ -162,7 +161,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         if (!isInitialized) {
             Log.w(TAG, "Engine not initialized, returning empty analysis")
             return EngineAnalysis(
-                bestMove = "", // Return empty string instead of invalid move
+                bestMove = "",
                 evaluation = 0f,
                 depth = 1,
                 principalVariation = emptyList(),
@@ -172,13 +171,11 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         }
         
         return withContext(Dispatchers.IO) {
-            // Ensure engine is ready for new analysis
             sendCommand("stop")
-            delay(100) // Give engine time to stop current analysis
-            
-            // Send isready command and wait for readyok to ensure engine is synchronized
+            delay(100)
+
             sendCommand("isready")
-            delay(100) // Wait for engine to confirm it's ready
+            delay(100)
             
             configureForSkillLevel(settings)
             
@@ -202,7 +199,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
                                 bestMove = parts[1]
                                 Log.d(TAG, "Extracted bestMove: $bestMove")
                             }
-                            cancel() // Stop collecting after bestmove
+                            cancel()
                         }
                         line.startsWith("info ") && line.contains("depth ") -> {
                             val depthMatch = Regex("depth (\\d+)").find(line)
@@ -271,8 +268,6 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
             Log.d(TAG, "Sending go command: $goCommand")
             sendCommand(goCommand)
             
-            // Wait for the job to complete naturally (when bestmove is received)
-            // but with a reasonable timeout as fallback
             val timeout = maxOf(settings.timeLimit + 2000L, 5000L)
             val timeoutJob = launch {
                 delay(timeout)
@@ -282,11 +277,11 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
                 }
             }
             
-            job.join() // Wait for analysis to complete
-            timeoutJob.cancel() // Cancel timeout since we completed normally
+            job.join()
+            timeoutJob.cancel()
             
             EngineAnalysis(
-                bestMove = bestMove, // Don't use fallback here, let the repository handle it
+                bestMove = bestMove,
                 evaluation = evaluation,
                 depth = depth,
                 principalVariation = pv,

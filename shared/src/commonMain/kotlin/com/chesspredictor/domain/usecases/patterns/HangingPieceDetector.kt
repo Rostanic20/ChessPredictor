@@ -8,14 +8,6 @@ import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TacticalPattern
 import com.chesspredictor.domain.entities.opposite
 
-/**
- * Detects hanging (undefended) pieces that can be captured.
- * 
- * A piece is considered hanging if:
- * - It is attacked by at least one enemy piece
- * - It has no defenders
- * - It is not a king (kings can't be hanging)
- */
 class HangingPieceDetector : PatternDetector {
 
     companion object {
@@ -27,7 +19,7 @@ class HangingPieceDetector : PatternDetector {
         val hangingPieces = mutableListOf<TacticalPattern>()
         
         for ((square, piece) in gameState.board) {
-            if (piece is ChessPiece.King) continue // Kings can't be hanging
+            if (piece is ChessPiece.King) continue
             
             val pattern = checkIfPieceIsHanging(square, piece, gameState)
             if (pattern != null) {

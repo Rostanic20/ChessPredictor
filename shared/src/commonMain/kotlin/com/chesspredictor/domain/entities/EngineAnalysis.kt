@@ -10,8 +10,8 @@ data class EngineAnalysis(
 )
 
 data class EngineEvaluation(
-    val score: Double, // Score in pawns (positive = white advantage, negative = black advantage)
-    val mate: Int? = null, // Number of moves to mate (positive = white mates, negative = black mates)
+    val score: Double,
+    val mate: Int? = null,
     val isMateScore: Boolean = false
 ) {
     fun getDisplayScore(fromPerspective: ChessColor): String {

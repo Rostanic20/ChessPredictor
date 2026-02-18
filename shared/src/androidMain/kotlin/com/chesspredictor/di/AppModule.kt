@@ -21,6 +21,5 @@ fun getOrCreateAndroidAppModule(): AppModule {
 }
 
 actual fun createStockfishDataSource(): StockfishDataSource {
-    // Use WebView implementation
     return StockfishDataSource(applicationContext)
 }

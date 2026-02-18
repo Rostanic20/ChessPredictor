@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stockfish Chess Engine</title>
+</head>
+<body>
+    <div id="status">Initializing...</div>
+
+    <script>
+        var stockfish = null;
+        var isReady = false;
+        var commandQueue = [];
+
+        function sendToiOS(type, message) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iosHandler) {
+                window.webkit.messageHandlers.iosHandler.postMessage({type: type, data: message});
+            }
+        }
+
+        self.postMessage = function(msg) {
+            sendToiOS('message', msg);
+
+            if (msg === 'uciok') {
+                isReady = true;
+                document.getElementById('status').innerHTML = 'Ready - Optimizing...';
+
+                if (window.optimizationCommands) {
+                    window.optimizationCommands.forEach(function(cmd, index) {
+                        setTimeout(function() {
+                            sendCommandToStockfish(cmd);
+
+                            if (index === window.optimizationCommands.length - 1) {
+                                setTimeout(function() {
+                                    document.getElementById('status').innerHTML = 'Ready (Optimized)';
+                                    sendCommandToStockfish('isready');
+                                }, 50);
+                            }
+                        }, index * 50);
+                    });
+                }
+
+                setTimeout(function() {
+                    while (commandQueue.length > 0) {
+                        var cmd = commandQueue.shift();
+                        sendCommandToStockfish(cmd);
+                    }
+                    sendToiOS('ready', 'true');
+                }, window.optimizationCommands ? window.optimizationCommands.length * 50 + 100 : 100);
+            }
+        };
+
+        function sendCommandToStockfish(cmd) {
+            try {
+                if (typeof Module !== 'undefined' && Module.ccall) {
+                    Module.ccall("uci_command", "number", ["string"], [cmd]);
+                }
+            } catch (e) {
+                sendToiOS('error', 'Command error: ' + e.message);
+            }
+        }
+
+        function initStockfish() {
+            try {
+                var script = document.createElement('script');
+                script.src = 'stockfish_browser.js';
+                script.onload = function() {
+                    setTimeout(function() {
+                        setupStockfish();
+                    }, 1000);
+                };
+                script.onerror = function(e) {
+                    sendToiOS('error', 'Failed to load stockfish.js');
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                sendToiOS('error', 'Init error: ' + e.message);
+            }
+        }
+
+        function setupStockfish() {
+            try {
+                if (typeof Module !== 'undefined' && Module.ccall) {
+                    stockfish = {
+                        postMessage: function(cmd) {
+                            if (cmd === 'quit') return;
+                            sendCommandToStockfish(cmd);
+                        }
+                    };
+
+                    sendCommandToStockfish('uci');
+
+                    window.optimizationCommands = [
+                        'setoption name Hash value 64',
+                        'setoption name Threads value 1',
+                        'setoption name Ponder value false',
+                        'setoption name MultiPV value 1',
+                        'setoption name Skill Level value 10',
+                        'setoption name Move Overhead value 100',
+                        'setoption name Minimum Thinking Time value 300',
+                        'setoption name UCI_LimitStrength value true',
+                        'setoption name UCI_Elo value 1600'
+                    ];
+                } else {
+                    sendToiOS('error', 'Module.ccall not available');
+                }
+            } catch (e) {
+                sendToiOS('error', 'Setup error: ' + e.message);
+            }
+        }
+
+        var commandBuffer = [];
+        var processingBatch = false;
+
+        function processBatchCommands() {
+            if (processingBatch || commandBuffer.length === 0) return;
+
+            processingBatch = true;
+            var batch = commandBuffer.splice(0, Math.min(5, commandBuffer.length));
+
+            batch.forEach(function(cmd, index) {
+                setTimeout(function() {
+                    if (stockfish && stockfish.postMessage && isReady) {
+                        stockfish.postMessage(cmd);
+                    }
+
+                    if (index === batch.length - 1) {
+                        processingBatch = false;
+                        if (commandBuffer.length > 0) {
+                            setTimeout(processBatchCommands, 5);
+                        }
+                    }
+                }, index * 2);
+            });
+        }
+
+        window.sendCommand = function(cmd) {
+            if (stockfish && stockfish.postMessage) {
+                if (isReady) {
+                    if (cmd.startsWith('go ') || cmd === 'stop' || cmd === 'quit' || cmd === 'isready') {
+                        stockfish.postMessage(cmd);
+                    } else {
+                        commandBuffer.push(cmd);
+                        processBatchCommands();
+                    }
+                } else {
+                    commandQueue.push(cmd);
+                }
+            }
+        };
+
+        window.onload = function() {
+            initStockfish();
+        };
+    </script>
+</body>
+</html>

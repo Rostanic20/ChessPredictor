@@ -28,15 +28,11 @@ class ChessRulesEngine {
     }
     
     fun makeMove(gameState: GameState, move: ChessMove): GameState? {
-        // Validate move
         if (!moveValidator.isMoveLegal(gameState, move)) {
             return null
         }
         
-        // Execute move
         var newState = moveExecutor.executeMove(gameState, move)
-        
-        // Update game status
         newState = newState.copy(
             isCheck = checkDetector.isKingInCheck(newState, newState.turn),
             isCheckmate = checkDetector.isCheckmate(newState),
@@ -44,7 +40,6 @@ class ChessRulesEngine {
             isDraw = drawDetector.isDraw(newState)
         )
         
-        // Generate SAN notation and update the last move
         if (newState.moveHistory.isNotEmpty()) {
             val lastMove = newState.moveHistory.last()
             val san = sanGenerator.generateSAN(gameState, move, newState)
@@ -90,7 +85,6 @@ class ChessRulesEngine {
     }
     
     fun isInsufficientMaterial(board: Map<Square, ChessPiece>): Boolean {
-        // Create a minimal GameState for the call
         val gameState = GameState(
             board = board,
             turn = ChessColor.WHITE,

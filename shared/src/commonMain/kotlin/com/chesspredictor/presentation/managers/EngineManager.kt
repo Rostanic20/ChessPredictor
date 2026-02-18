@@ -251,7 +251,7 @@ class EngineManager(
 
         if (movesSinceLastDrawOffer < DRAW_OFFER_MIN_MOVES) return
 
-        val lastEval = lastEvaluation // Capture for smart cast
+        val lastEval = lastEvaluation
 
         try {
             val positionAnalysis = repository.analyzePosition(board, settings)

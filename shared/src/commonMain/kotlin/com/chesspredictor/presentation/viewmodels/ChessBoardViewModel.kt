@@ -280,6 +280,10 @@ class ChessBoardViewModel(
         }
     }
 
+    fun executePromotionMove(from: Square, to: Square, promotionPiece: ChessPiece) {
+        executeMove(from, to, promotionPiece)
+    }
+
     private fun executeMove(from: Square, to: Square, promotionPiece: ChessPiece? = null) {
         val timeSpent = if (moveStartTime > 0) TimeProvider.currentTimeMillis() - moveStartTime else ChessConstants.DEFAULT_MOVE_TIME_MS
         moveStartTime = 0L

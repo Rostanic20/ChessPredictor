@@ -19,36 +19,23 @@ class AnimationManager {
     ): List<PieceAnimation> {
         val animations = mutableListOf<PieceAnimation>()
         
-        // Determine the type of move
         val moveType = analyzeMoveType(move, oldGameState)
-        
-        // Create main piece animation
+
         animations.add(createMainAnimation(move, moveType))
-        
-        // Add special animations based on move type
         when (moveType) {
             MoveType.CASTLING -> addCastlingAnimations(animations, move, oldGameState)
             MoveType.EN_PASSANT -> addEnPassantAnimations(animations, move, oldGameState)
             MoveType.CAPTURE -> addCaptureAnimation(animations, move)
-            else -> { /* Standard move needs no additional animations */ }
+            else -> { }
         }
         
         return animations
     }
     
-    /**
-     * Determines if animations should be skipped for a particular square.
-     * Now animations work properly with board flipping, so no squares need to be skipped.
-     */
     fun shouldSkipAnimation(@Suppress("UNUSED_PARAMETER") square: Square, @Suppress("UNUSED_PARAMETER") isFlipped: Boolean = false): Boolean {
-        // Animations now work properly with board flipping
         return false
     }
     
-    /**
-     * Returns the set of squares that have animation glitches based on board orientation.
-     * All animations now work properly, so no squares are glitched.
-     */
     fun getGlitchedSquares(@Suppress("UNUSED_PARAMETER") isFlipped: Boolean = false): Set<Square> {
         return emptySet()
     }

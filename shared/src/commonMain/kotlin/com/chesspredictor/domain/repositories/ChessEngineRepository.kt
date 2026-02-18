@@ -18,6 +18,6 @@ interface ChessEngineRepository {
 data class PositionAnalysis(
     val bestMove: ChessMove?,
     val evaluation: Float,
-    val mate: Int? = null, // moves to mate, null if not mate
+    val mate: Int? = null,
     val principalVariation: List<ChessMove> = emptyList()
 )

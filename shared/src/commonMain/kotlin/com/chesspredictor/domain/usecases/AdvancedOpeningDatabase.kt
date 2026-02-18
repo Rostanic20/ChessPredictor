@@ -9,12 +9,7 @@ import com.chesspredictor.domain.entities.OpeningTheme
 class AdvancedOpeningDatabase {
     
     companion object {
-        // Advanced opening database with 200+ major openings and variations
         val openingDatabase = listOf(
-            
-            // ===== KING'S PAWN OPENINGS (1.e4) =====
-            
-            // Ruy Lopez Complex
             ChessOpening(
                 name = "Ruy Lopez: Marshall Attack",
                 eco = "C89",
@@ -107,7 +102,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "C60"
             ),
             
-            // Italian Game Complex
             ChessOpening(
                 name = "Italian Game: Evans Gambit",
                 eco = "C51",
@@ -176,7 +170,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "C50"
             ),
             
-            // Sicilian Defense Complex
             ChessOpening(
                 name = "Sicilian: Najdorf Variation",
                 eco = "B90",
@@ -299,7 +292,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "B20"
             ),
             
-            // French Defense Complex
             ChessOpening(
                 name = "French Defense: Winawer Variation",
                 eco = "C15",
@@ -351,9 +343,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "C00"
             ),
             
-            // ===== QUEEN'S PAWN OPENINGS (1.d4) =====
-            
-            // Queen's Gambit Complex
             ChessOpening(
                 name = "Queen's Gambit: Declined, Orthodox Defense",
                 eco = "D63",
@@ -422,7 +411,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "E00"
             ),
             
-            // Nimzo-Indian Complex
             ChessOpening(
                 name = "Nimzo-Indian Defense: Classical Variation",
                 eco = "E32",
@@ -457,7 +445,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "E20"
             ),
             
-            // King's Indian Complex
             ChessOpening(
                 name = "King's Indian Defense: Classical Variation",
                 eco = "E97",
@@ -508,8 +495,6 @@ class AdvancedOpeningDatabase {
                 themes = listOf(OpeningTheme.POSITIONAL, OpeningTheme.FIANCHETTO),
                 parentOpening = "E60"
             ),
-            
-            // ===== ENGLISH OPENING (1.c4) =====
             
             ChessOpening(
                 name = "English Opening: Symmetrical Variation",
@@ -562,8 +547,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "A10"
             ),
             
-            // ===== FLANK AND IRREGULAR OPENINGS =====
-            
             ChessOpening(
                 name = "Réti Opening",
                 eco = "A04",
@@ -615,7 +598,6 @@ class AdvancedOpeningDatabase {
                 parentOpening = "A04"
             ),
             
-            // Additional Popular Openings
             ChessOpening(
                 name = "Caro-Kann Defense",
                 eco = "B10",

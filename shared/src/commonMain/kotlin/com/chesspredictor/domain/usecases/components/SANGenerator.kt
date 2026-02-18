@@ -17,21 +17,17 @@ class SANGenerator(
     fun generateSAN(gameState: GameState, move: ChessMove, newState: GameState?): String {
         val sb = StringBuilder()
         
-        // Handle castling first
         if (move.piece is ChessPiece.King && abs(move.from.file.code - move.to.file.code) == 2) {
             return if (move.to.file > move.from.file) "O-O" else "O-O-O"
         }
         
-        // Add piece symbol (except for pawns)
         if (move.piece !is ChessPiece.Pawn) {
             sb.append(getPieceSymbol(move.piece))
             
-            // Add disambiguation if needed
             val disambiguation = getDisambiguation(gameState, move)
             sb.append(disambiguation)
         }
         
-        // Add capture symbol
         if (move.capturedPiece != null || (move.piece is ChessPiece.Pawn && move.to == gameState.enPassantSquare)) {
             if (move.piece is ChessPiece.Pawn) {
                 sb.append(move.from.file)
@@ -39,17 +35,14 @@ class SANGenerator(
             sb.append("x")
         }
         
-        // Add destination square
         sb.append(move.to.file)
         sb.append(move.to.rank)
         
-        // Add promotion
         if (move.promotion != null) {
             sb.append("=")
             sb.append(getPieceSymbol(move.promotion))
         }
         
-        // Add check/checkmate notation
         if (newState != null) {
             when {
                 checkDetector.isCheckmate(newState) -> sb.append("#")
@@ -72,7 +65,6 @@ class SANGenerator(
     }
     
     private fun getDisambiguation(gameState: GameState, move: ChessMove): String {
-        // Find all pieces of the same type that can move to the same square
         val sameTypeMoves = moveGenerator.generateLegalMoves(gameState).filter { otherMove ->
             otherMove.piece::class == move.piece::class &&
             otherMove.piece.color == move.piece.color &&
@@ -84,19 +76,16 @@ class SANGenerator(
             return ""
         }
         
-        // Check if file disambiguation is sufficient
         val sameFile = sameTypeMoves.any { it.from.file == move.from.file }
         if (!sameFile) {
             return move.from.file.toString()
         }
         
-        // Check if rank disambiguation is sufficient
         val sameRank = sameTypeMoves.any { it.from.rank == move.from.rank }
         if (!sameRank) {
             return move.from.rank.toString()
         }
         
-        // Use full square notation
         return "${move.from.file}${move.from.rank}"
     }
 }

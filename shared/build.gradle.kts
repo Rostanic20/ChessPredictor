@@ -2,10 +2,26 @@ plugins {
     kotlin("multiplatform")
     id("com.android.library")
     kotlin("plugin.serialization") version "1.9.23"
+    kotlin("native.cocoapods")
 }
 
 kotlin {
     androidTarget()
+    iosX64()
+    iosArm64()
+
+    cocoapods {
+        summary = "ChessPredictor shared KMP module"
+        homepage = "https://github.com/Rostanic20/ChessPredictor"
+        version = "1.0"
+        ios.deploymentTarget = "16.0"
+        podfile = project.file("../iosApp/Podfile")
+        framework {
+            baseName = "shared"
+            isStatic = true
+        }
+    }
+
     js(IR) {
         browser {
             testTask {
@@ -64,6 +80,20 @@ kotlin {
             dependencies {
                 implementation(kotlin("test-js"))
             }
+        }
+        val iosX64Main by getting
+        val iosArm64Main by getting
+        val iosMain by creating {
+            dependsOn(commonMain)
+            iosX64Main.dependsOn(this)
+            iosArm64Main.dependsOn(this)
+        }
+        val iosX64Test by getting
+        val iosArm64Test by getting
+        val iosTest by creating {
+            dependsOn(commonTest)
+            iosX64Test.dependsOn(this)
+            iosArm64Test.dependsOn(this)
         }
     }
 }

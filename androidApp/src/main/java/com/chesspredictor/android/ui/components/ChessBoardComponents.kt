@@ -64,11 +64,9 @@ fun ModernChessBoard(
         )
     ) {
         if (uiState.showCoordinates) {
-            // Board with coordinates - proper spacing
             Column(
                 modifier = Modifier.padding(8.dp)
             ) {
-                // Top file labels
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -89,14 +87,12 @@ fun ModernChessBoard(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(2.dp))
-                
-                // Board with side labels
+
                 Row(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Left rank labels
                     Column(
                         modifier = Modifier.width(24.dp),
                         verticalArrangement = Arrangement.Center
@@ -118,15 +114,13 @@ fun ModernChessBoard(
                             }
                         }
                     }
-                    
-                    // Chess board
+
                     ChessBoardGrid(
                         uiState = uiState,
                         onSquareClick = onSquareClick,
                         modifier = Modifier.weight(1f)
                     )
-                    
-                    // Right rank labels
+
                     Column(
                         modifier = Modifier.width(24.dp),
                         verticalArrangement = Arrangement.Center
@@ -149,10 +143,9 @@ fun ModernChessBoard(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(2.dp))
-                
-                // Bottom file labels
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -175,7 +168,6 @@ fun ModernChessBoard(
                 }
             }
         } else {
-            // Board without coordinates
             ChessBoardGrid(
                 uiState = uiState,
                 onSquareClick = onSquareClick,
@@ -193,19 +185,19 @@ private fun ChessBoardGrid(
 ) {
     val squarePositions = remember { mutableStateOf<Map<Square, Offset>>(emptyMap()) }
     val boardSize = remember { mutableStateOf(IntSize.Zero) }
-    
+
     LaunchedEffect(boardSize.value, uiState.isFlipped, uiState.showCoordinates) {
         if (boardSize.value != IntSize.Zero) {
             val squareSize = boardSize.value.width / 8f
             val positions = mutableMapOf<Square, Offset>()
-            
+
             for (rank in 1..8) {
                 for (fileChar in 'a'..'h') {
                     val square = Square(fileChar, rank)
-                    
+
                     val fileIndex = if (uiState.isFlipped) (7 - (fileChar - 'a')) else (fileChar - 'a')
                     val rankIndex = if (uiState.isFlipped) (rank - 1) else (8 - rank)
-                    
+
                     val centerOffset = Offset(
                         x = fileIndex.toFloat() * squareSize + squareSize / 2f,
                         y = rankIndex.toFloat() * squareSize + squareSize / 2f
@@ -218,9 +210,8 @@ private fun ChessBoardGrid(
             squarePositions.value = emptyMap()
         }
     }
-    
+
     Box(modifier = modifier) {
-        // Board grid with squares
         Column(
             modifier = Modifier
                 .border(2.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
@@ -236,7 +227,7 @@ private fun ChessBoardGrid(
                         val square = Square(file, rank)
                         val isAnimatingFrom = square in uiState.animatingPieces
                         val piece = if (isAnimatingFrom) null else uiState.boardState[square]
-                        
+
                         ChessSquare(
                             square = square,
                             piece = piece,
@@ -244,8 +235,8 @@ private fun ChessBoardGrid(
                             isPossibleMove = square in uiState.possibleMoves,
                             isLastMoveFrom = uiState.lastMove?.from == square,
                             isLastMoveTo = uiState.lastMove?.to == square,
-                            isCheck = uiState.isCheck && 
-                                uiState.boardState[square] is ChessPiece.King && 
+                            isCheck = uiState.isCheck &&
+                                uiState.boardState[square] is ChessPiece.King &&
                                 uiState.boardState[square]?.color == uiState.currentTurn,
                             onClick = { onSquareClick(square) },
                             modifier = Modifier.weight(1f)
@@ -254,7 +245,7 @@ private fun ChessBoardGrid(
                 }
             }
         }
-        
+
         if (squarePositions.value.isNotEmpty() && boardSize.value != IntSize.Zero) {
             AnimatedPiecesOverlay(
                 animations = uiState.animations,
@@ -281,21 +272,21 @@ fun ChessSquare(
     modifier: Modifier = Modifier
 ) {
     val isLightSquare = ((square.file - 'a') + (square.rank - 1)) % 2 == 0
-    
+
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            isCheck -> Color(0xFFFF6B6B) // Red for check
-            isSelected -> Color(0xFF7FA650) // Green for selected
+            isCheck -> Color(0xFFFF6B6B)
+            isSelected -> Color(0xFF7FA650)
             isLastMoveFrom || isLastMoveTo -> {
-                if (isLightSquare) Color(0xFFF7EC83) else Color(0xFFD9CA61) // Yellow for last move
+                if (isLightSquare) Color(0xFFF7EC83) else Color(0xFFD9CA61)
             }
-            isLightSquare -> Color(0xFFF0D9B5) // Light squares
-            else -> Color(0xFFB58863) // Dark squares
+            isLightSquare -> Color(0xFFF0D9B5)
+            else -> Color(0xFFB58863)
         },
         animationSpec = tween(200),
         label = "square color"
     )
-    
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -304,7 +295,6 @@ fun ChessSquare(
             .testTag("chess_square_$square"),
         contentAlignment = Alignment.Center
     ) {
-        // Possible move indicator
         if (isPossibleMove) {
             Box(
                 modifier = Modifier
@@ -316,8 +306,7 @@ fun ChessSquare(
                     )
             )
         }
-        
-        // Chess piece
+
         piece?.let {
             ChessPieceView(piece = it)
         }
@@ -344,9 +333,8 @@ fun CapturedPiecesDisplay(
     color: ChessColor,
     modifier: Modifier = Modifier
 ) {
-    // Show pieces of the OPPOSITE color (these are the pieces this color captured)
     val pieces = capturedPieces
-        .filter { it.color != color }  // Changed from == to !=
+        .filter { it.color != color }
         .groupBy { piece ->
             when (piece) {
                 is ChessPiece.Queen -> 5
@@ -359,7 +347,7 @@ fun CapturedPiecesDisplay(
         }
         .toSortedMap(reverseOrder())
         .flatMap { it.value }
-    
+
     val materialValue = pieces.sumOf { piece ->
         when (piece) {
             is ChessPiece.Queen -> 9
@@ -370,7 +358,7 @@ fun CapturedPiecesDisplay(
             else -> 0
         }.toInt()
     }
-    
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -401,9 +389,9 @@ fun CapturedPiecesDisplay(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
@@ -457,7 +445,7 @@ fun MoveHistoryDisplay(
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 openingInfo?.opening?.let { opening ->
                     Text(
                         text = opening.eco,
@@ -467,8 +455,7 @@ fun MoveHistoryDisplay(
                     )
                 }
             }
-            
-            // Opening name if detected
+
             openingInfo?.opening?.let { opening ->
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -485,9 +472,9 @@ fun MoveHistoryDisplay(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             if (moveHistory.isEmpty()) {
                 Text(
                     text = "No moves yet",
@@ -500,7 +487,6 @@ fun MoveHistoryDisplay(
                 ) {
                     itemsIndexed(moveHistory.chunked(2)) { index, moves ->
                         if (showAnalysis) {
-                            // Enhanced analysis view
                             Column {
                                 Row(
                                     modifier = Modifier
@@ -514,21 +500,21 @@ fun MoveHistoryDisplay(
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium
                                     )
-                                    
+
                                     moves.getOrNull(0)?.let { move ->
                                         val moveIndex = index * 2
                                         val analysis = gameAnalysis?.moves?.getOrNull(moveIndex)
-                                        
+
                                         Column(modifier = Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = move.san.ifEmpty { 
-                                                        "${move.move.from}-${move.move.to}" 
+                                                    text = move.san.ifEmpty {
+                                                        "${move.move.from}-${move.move.to}"
                                                     },
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Normal
                                                 )
-                                                
+
                                                 analysis?.let { moveAnalysis ->
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
@@ -538,7 +524,7 @@ fun MoveHistoryDisplay(
                                                     )
                                                 }
                                             }
-                                            
+
                                             analysis?.comment?.takeIf { it.isNotEmpty() }?.let { comment ->
                                                 Text(
                                                     text = comment,
@@ -549,21 +535,21 @@ fun MoveHistoryDisplay(
                                             }
                                         }
                                     }
-                                    
+
                                     moves.getOrNull(1)?.let { move ->
                                         val moveIndex = index * 2 + 1
                                         val analysis = gameAnalysis?.moves?.getOrNull(moveIndex)
-                                        
+
                                         Column(modifier = Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = move.san.ifEmpty { 
-                                                        "${move.move.from}-${move.move.to}" 
+                                                    text = move.san.ifEmpty {
+                                                        "${move.move.from}-${move.move.to}"
                                                     },
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Normal
                                                 )
-                                                
+
                                                 analysis?.let { moveAnalysis ->
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
@@ -573,7 +559,7 @@ fun MoveHistoryDisplay(
                                                     )
                                                 }
                                             }
-                                            
+
                                             analysis?.comment?.takeIf { it.isNotEmpty() }?.let { comment ->
                                                 Text(
                                                     text = comment,
@@ -587,7 +573,6 @@ fun MoveHistoryDisplay(
                                 }
                             }
                         } else {
-                            // Simple view for game screen
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -600,22 +585,22 @@ fun MoveHistoryDisplay(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium
                                 )
-                                
+
                                 moves.getOrNull(0)?.let { move ->
                                     Text(
-                                        text = move.san.ifEmpty { 
-                                            "${move.move.from}-${move.move.to}" 
+                                        text = move.san.ifEmpty {
+                                            "${move.move.from}-${move.move.to}"
                                         },
                                         modifier = Modifier.width(70.dp),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Normal
                                     )
                                 }
-                                
+
                                 moves.getOrNull(1)?.let { move ->
                                     Text(
-                                        text = move.san.ifEmpty { 
-                                            "${move.move.from}-${move.move.to}" 
+                                        text = move.san.ifEmpty {
+                                            "${move.move.from}-${move.move.to}"
                                         },
                                         modifier = Modifier.width(70.dp),
                                         fontSize = 13.sp,
@@ -631,7 +616,6 @@ fun MoveHistoryDisplay(
     }
 }
 
-
 @Composable
 fun NewGameConfirmationDialog(
     onConfirm: () -> Unit,
@@ -639,13 +623,13 @@ fun NewGameConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { 
+        title = {
             Text(
                 text = "Start New Game?",
                 fontWeight = FontWeight.Bold
             )
         },
-        text = { 
+        text = {
             Text("Your current game progress will be lost. Are you sure you want to start a new game?")
         },
         confirmButton = {
@@ -702,7 +686,7 @@ fun GameStatusCard(
             modifier = modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (uiState.isCheck) 
+                containerColor = if (uiState.isCheck)
                     MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
                 else MaterialTheme.colorScheme.surfaceVariant
             )
@@ -724,7 +708,7 @@ fun GameStatusCard(
                             .size(20.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(
-                                if (uiState.currentTurn == ChessColor.WHITE) Color.White 
+                                if (uiState.currentTurn == ChessColor.WHITE) Color.White
                                 else Color.Black
                             )
                             .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
@@ -739,7 +723,7 @@ fun GameStatusCard(
                         )
                     }
                 }
-                
+
                 if (isThinking) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
@@ -748,13 +732,13 @@ fun GameStatusCard(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "Thinking...", 
+                            "Thinking...",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
                 } else if (!isEngineReady) {
                     Text(
-                        "Engine loading...", 
+                        "Engine loading...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -794,12 +778,12 @@ fun AnimatedChessPiece(
 ) {
     val fromPosition = squarePositions[animation.fromSquare]
     val toPosition = squarePositions[animation.toSquare]
-    
-    if (fromPosition == null || toPosition == null || 
+
+    if (fromPosition == null || toPosition == null ||
         fromPosition == Offset.Zero || toPosition == Offset.Zero) return
-    
+
     var targetPosition by remember(animation.animationId) { mutableStateOf(fromPosition) }
-    
+
     val animatedOffset by animateOffsetAsState(
         targetValue = targetPosition,
         animationSpec = tween(
@@ -808,11 +792,11 @@ fun AnimatedChessPiece(
         ),
         label = "piece_position"
     )
-    
+
     LaunchedEffect(animation.animationId) {
         targetPosition = toPosition
     }
-    
+
     val animatedAlpha by animateFloatAsState(
         targetValue = when (animation.animationType) {
             AnimationType.PIECE_FADE_OUT,
@@ -822,12 +806,12 @@ fun AnimatedChessPiece(
         animationSpec = tween(300),
         label = "piece_alpha"
     )
-    
+
     val animatedScale by animateFloatAsState(
         targetValue = when (animation.animationType) {
             AnimationType.PIECE_FADE_OUT,
-            AnimationType.EN_PASSANT_CAPTURE -> 0.8f // Slightly shrink captured pieces
-            AnimationType.PROMOTION -> 1.2f // Slightly grow promoted pieces
+            AnimationType.EN_PASSANT_CAPTURE -> 0.8f
+            AnimationType.PROMOTION -> 1.2f
             else -> 1.0f
         },
         animationSpec = spring(
@@ -836,10 +820,10 @@ fun AnimatedChessPiece(
         ),
         label = "piece_scale"
     )
-    
+
     if (boardSize != IntSize.Zero) {
         val squareSize = boardSize.width / 8f
-        
+
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -863,7 +847,6 @@ fun AnimatedChessPiece(
         }
     }
 }
-
 
 @Composable
 fun OpeningInfoCard(
@@ -891,7 +874,7 @@ fun OpeningInfoCard(
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 openingInfo?.opening?.let { opening ->
                     Text(
                         text = opening.eco,
@@ -901,9 +884,9 @@ fun OpeningInfoCard(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             if (openingInfo?.opening != null) {
                 openingInfo.opening?.let { opening ->
                     Text(
@@ -912,7 +895,7 @@ fun OpeningInfoCard(
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    
+
                     openingInfo.variation?.let { variation ->
                         Text(
                             text = variation,
@@ -921,8 +904,7 @@ fun OpeningInfoCard(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
-                    
-                    
+
                     Text(
                         text = "Moves matched: ${openingInfo.moveNumber}/${opening.moves.size}",
                         fontSize = 11.sp,
@@ -968,7 +950,7 @@ fun LiveAnalysisCard(
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 if (gameAnalysis != null) {
                     Text(
                         text = gameAnalysis.gamePhase.name.lowercase().replaceFirstChar { it.uppercase() },
@@ -978,11 +960,10 @@ fun LiveAnalysisCard(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             if (gameAnalysis != null) {
-                // Last Move Analysis - Most Important Info
                 val lastMove = gameAnalysis.moves.lastOrNull()
                 if (lastMove != null) {
                     Row(
@@ -1010,13 +991,12 @@ fun LiveAnalysisCard(
                                 fontWeight = FontWeight.Medium
                             )
                         }
-                        
-                        // Compact accuracy for current turn
+
                         val moveCount = gameAnalysis.moves.size
                         val isWhiteTurn = moveCount % 2 == 0
                         val currentPlayerAccuracy = if (isWhiteTurn) gameAnalysis.accuracy.white else gameAnalysis.accuracy.black
                         val playerName = if (isWhiteTurn) "White" else "Black"
-                        
+
                         if (currentPlayerAccuracy > 0) {
                             Text(
                                 text = "$playerName: ${currentPlayerAccuracy.toInt()}%",
@@ -1027,7 +1007,6 @@ fun LiveAnalysisCard(
                         }
                     }
                 } else {
-                    // No moves yet
                     Text(
                         text = "Game starting...",
                         fontSize = 12.sp,
@@ -1071,7 +1050,7 @@ fun MoveAnalysisCard(
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 if (gameAnalysis != null) {
                     Text(
                         text = gameAnalysis.gamePhase.name.lowercase().replaceFirstChar { it.uppercase() },
@@ -1081,11 +1060,10 @@ fun MoveAnalysisCard(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             if (gameAnalysis != null) {
-                // Accuracy Display
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -1100,13 +1078,13 @@ fun MoveAnalysisCard(
                             text = if (gameAnalysis.accuracy.white > 0) "${gameAnalysis.accuracy.white.toInt()}%" else "—",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (gameAnalysis.accuracy.white > 0) getAccuracyColor(gameAnalysis.accuracy.white) 
+                            color = if (gameAnalysis.accuracy.white > 0) getAccuracyColor(gameAnalysis.accuracy.white)
                                    else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Column {
                         Text(
-                            text = "Black Accuracy", 
+                            text = "Black Accuracy",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1119,8 +1097,7 @@ fun MoveAnalysisCard(
                         )
                     }
                 }
-                
-                // Key Moments
+
                 if (gameAnalysis.keyMoments.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -1137,8 +1114,7 @@ fun MoveAnalysisCard(
                         )
                     }
                 }
-                
-                // Recent Move Analysis
+
                 val lastMove = gameAnalysis.moves.lastOrNull()
                 if (lastMove != null) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1169,7 +1145,7 @@ fun MoveAnalysisCard(
                         )
                     }
                 }
-                
+
             } else {
                 Text(
                     text = "Play at least 6 moves (3 per player) to see analysis",
@@ -1185,23 +1161,23 @@ fun MoveAnalysisCard(
 @Composable
 private fun getAccuracyColor(accuracy: Float): Color {
     return when {
-        accuracy >= 90 -> Color(0xFF4CAF50) // Green
-        accuracy >= 80 -> Color(0xFF8BC34A) // Light green
-        accuracy >= 70 -> Color(0xFFFFEB3B) // Yellow
-        accuracy >= 60 -> Color(0xFFFF9800) // Orange
-        else -> Color(0xFFF44336) // Red
+        accuracy >= 90 -> Color(0xFF4CAF50)
+        accuracy >= 80 -> Color(0xFF8BC34A)
+        accuracy >= 70 -> Color(0xFFFFEB3B)
+        accuracy >= 60 -> Color(0xFFFF9800)
+        else -> Color(0xFFF44336)
     }
 }
 
 @Composable
 private fun getMoveQualityColor(quality: MoveQuality): Color {
     return when (quality) {
-        MoveQuality.BRILLIANT -> Color(0xFF00BCD4) // Cyan
-        MoveQuality.GREAT -> Color(0xFF4CAF50) // Green
+        MoveQuality.BRILLIANT -> Color(0xFF00BCD4)
+        MoveQuality.GREAT -> Color(0xFF4CAF50)
         MoveQuality.GOOD -> MaterialTheme.colorScheme.onSurfaceVariant
-        MoveQuality.INACCURACY -> Color(0xFFFF9800) // Orange
-        MoveQuality.MISTAKE -> Color(0xFFFF5722) // Deep orange
-        MoveQuality.BLUNDER -> Color(0xFFF44336) // Red
+        MoveQuality.INACCURACY -> Color(0xFFFF9800)
+        MoveQuality.MISTAKE -> Color(0xFFFF5722)
+        MoveQuality.BLUNDER -> Color(0xFFF44336)
     }
 }
 

@@ -8,28 +8,19 @@ import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.utils.ChessUtils
 import com.chesspredictor.domain.utils.ChessConstants
 
-/**
- * Single source of truth for FEN string parsing and generation
- */
 class FenParser {
     
     fun parseGameState(fen: String): GameState {
         val parts = fen.split(" ")
         require(parts.size >= 4) { "Invalid FEN string" }
         
-        // Parse board
         val board = parseBoardPosition(parts[0])
-        
-        // Parse turn
+
         val turn = if (parts.getOrNull(1) == "b") ChessColor.BLACK else ChessColor.WHITE
-        
-        // Parse castling rights
+
         val castlingRights = parseCastlingRights(parts.getOrNull(2) ?: "-")
-        
-        // Parse en passant
+
         val enPassantSquare = parseEnPassantSquare(parts.getOrNull(3) ?: "-")
-        
-        // Parse clocks
         val halfMoveClock = parts.getOrNull(4)?.toIntOrNull() ?: 0
         val fullMoveNumber = parts.getOrNull(5)?.toIntOrNull() ?: 1
         

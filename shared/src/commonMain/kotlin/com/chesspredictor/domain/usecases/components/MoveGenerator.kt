@@ -7,7 +7,7 @@ import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.opposite
-import kotlin.math.abs // Used in generateKingMoves for castling detection
+import kotlin.math.abs
 
 class MoveGenerator {
     
@@ -200,10 +200,9 @@ class MoveGenerator {
     
     private fun generateQueenMoves(gameState: GameState, from: Square, queen: ChessPiece.Queen): List<ChessMove> {
         val moves = mutableListOf<ChessMove>()
-        // Queen moves like rook + bishop
         val directions = listOf(
-            Pair(0, 1), Pair(0, -1), Pair(1, 0), Pair(-1, 0),  // Rook directions
-            Pair(1, 1), Pair(1, -1), Pair(-1, 1), Pair(-1, -1)  // Bishop directions
+            Pair(0, 1), Pair(0, -1), Pair(1, 0), Pair(-1, 0),
+            Pair(1, 1), Pair(1, -1), Pair(-1, 1), Pair(-1, -1)
         )
         
         for ((deltaFile, deltaRank) in directions) {
@@ -234,7 +233,6 @@ class MoveGenerator {
     private fun generateKingMoves(gameState: GameState, from: Square, king: ChessPiece.King): List<ChessMove> {
         val moves = mutableListOf<ChessMove>()
         
-        // Regular king moves
         for (deltaFile in -1..1) {
             for (deltaRank in -1..1) {
                 if (deltaFile == 0 && deltaRank == 0) continue
@@ -253,15 +251,12 @@ class MoveGenerator {
             }
         }
         
-        // Castling
         if (!wouldKingBeInCheck(gameState, king.color)) {
-            // Kingside castling
             if (canCastleKingside(gameState, king.color)) {
                 val targetSquare = Square('g', from.rank)
                 moves.add(ChessMove(from, targetSquare, king))
             }
             
-            // Queenside castling
             if (canCastleQueenside(gameState, king.color)) {
                 val targetSquare = Square('c', from.rank)
                 moves.add(ChessMove(from, targetSquare, king))
@@ -277,11 +272,8 @@ class MoveGenerator {
         
         if (!canCastle) return false
         
-        // Check squares are empty
         val squaresToCheck = listOf(Square('f', rank), Square('g', rank))
         if (squaresToCheck.any { gameState.board[it] != null }) return false
-        
-        // Check squares are not attacked
         return squaresToCheck.none { isSquareAttackedBy(gameState, it, color.opposite()) }
     }
     
@@ -291,11 +283,8 @@ class MoveGenerator {
         
         if (!canCastle) return false
         
-        // Check squares are empty
         val squaresToCheck = listOf(Square('b', rank), Square('c', rank), Square('d', rank))
         if (squaresToCheck.any { gameState.board[it] != null }) return false
-        
-        // Check squares are not attacked (only c and d need to be safe)
         val squaresToCheckAttack = listOf(Square('c', rank), Square('d', rank))
         return squaresToCheckAttack.none { isSquareAttackedBy(gameState, it, color.opposite()) }
     }
@@ -316,16 +305,11 @@ class MoveGenerator {
     private fun simulateMove(gameState: GameState, move: ChessMove): GameState {
         val newBoard = gameState.board.toMutableMap()
         
-        // Remove piece from source
         newBoard.remove(move.from)
-        
-        // Place piece on destination
         val finalPiece = move.promotion ?: move.piece
         newBoard[move.to] = finalPiece
         
-        // Handle special moves
         when {
-            // Castling - move the rook
             move.piece is ChessPiece.King && abs(move.from.file.code - move.to.file.code) == 2 -> {
                 val isKingside = move.to.file > move.from.file
                 val rookFromFile = if (isKingside) 'h' else 'a'
@@ -338,7 +322,6 @@ class MoveGenerator {
                 }
             }
             
-            // En passant capture
             move.piece is ChessPiece.Pawn && move.to == gameState.enPassantSquare -> {
                 newBoard.remove(Square(move.to.file, move.from.rank))
             }

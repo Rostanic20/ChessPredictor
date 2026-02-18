@@ -16,18 +16,17 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.io.IOException
 
-// Extension property to get DataStore instance
 val Context.gameStateDataStore: DataStore<Preferences> by preferencesDataStore(name = "game_state")
 
 class GameStateRepositoryImpl(
     private val context: Context
 ) : GameStateRepository {
-    
-    private val json = Json { 
+
+    private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }
-    
+
     companion object {
         private val FEN_KEY = stringPreferencesKey("fen")
         private val MOVE_HISTORY_KEY = stringPreferencesKey("move_history")
@@ -39,7 +38,7 @@ class GameStateRepositoryImpl(
         private val SHOW_COORDINATES_KEY = booleanPreferencesKey("show_coordinates")
         private val TIMESTAMP_KEY = longPreferencesKey("timestamp")
     }
-    
+
     override suspend fun saveGameState(gameState: SavedGameState) {
         context.gameStateDataStore.edit { preferences ->
             preferences[FEN_KEY] = gameState.fen
@@ -53,7 +52,7 @@ class GameStateRepositoryImpl(
             preferences[TIMESTAMP_KEY] = gameState.timestamp
         }
     }
-    
+
     override suspend fun loadGameState(): SavedGameState? {
         return context.gameStateDataStore.data
             .catch { exception ->
@@ -85,13 +84,13 @@ class GameStateRepositoryImpl(
             }
             .first()
     }
-    
+
     override suspend fun clearGameState() {
         context.gameStateDataStore.edit { preferences ->
             preferences.clear()
         }
     }
-    
+
     override fun observeGameState(): Flow<SavedGameState?> {
         return context.gameStateDataStore.data
             .catch { exception ->
@@ -122,19 +121,18 @@ class GameStateRepositoryImpl(
                 }
             }
     }
-    
+
     private fun serializeMoveHistory(moves: List<DetailedMove>): String {
-        // Simple serialization format: from|to|san;from|to|san...
         return moves.joinToString(";") { move ->
             "${move.move.from.file}${move.move.from.rank}|" +
             "${move.move.to.file}${move.move.to.rank}|" +
             "${move.san}"
         }
     }
-    
+
     private fun deserializeMoveHistory(serialized: String): List<DetailedMove> {
         if (serialized.isEmpty()) return emptyList()
-        
+
         return serialized.split(";").mapNotNull { moveStr ->
             try {
                 val parts = moveStr.split("|")
@@ -145,10 +143,10 @@ class GameStateRepositoryImpl(
                         move = ChessMove(
                             from = from,
                             to = to,
-                            piece = ChessPiece.Pawn(ChessColor.WHITE) // Will be corrected when game state is restored
+                            piece = ChessPiece.Pawn(ChessColor.WHITE)
                         ),
-                        moveNumber = 1, // Default value, actual number will be determined from position
-                        isWhiteMove = true, // Default value, will be corrected based on actual game
+                        moveNumber = 1,
+                        isWhiteMove = true,
                         san = parts[2],
                         previousCastlingRights = CastlingRights(true, true, true, true),
                         previousEnPassantSquare = null
@@ -161,7 +159,7 @@ class GameStateRepositoryImpl(
             }
         }
     }
-    
+
     private fun serializeCapturedPieces(pieces: List<ChessPiece>): String {
         return pieces.joinToString(",") { piece ->
             val typeChar = when (piece) {
@@ -175,10 +173,10 @@ class GameStateRepositoryImpl(
             "${typeChar}${if (piece.color == ChessColor.WHITE) "W" else "B"}"
         }
     }
-    
+
     private fun deserializeCapturedPieces(serialized: String): List<ChessPiece> {
         if (serialized.isEmpty()) return emptyList()
-        
+
         return serialized.split(",").mapNotNull { pieceStr ->
             try {
                 val type = pieceStr[0]

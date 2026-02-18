@@ -22,17 +22,16 @@ class OpeningDetector {
 
     private val openingDatabase = AdvancedOpeningDatabase.openingDatabase
 
-    private val transpositionCache = LinkedHashMap<String, ChessOpening>(MAX_CACHE_SIZE, 0.75f, true)
+    private val transpositionCache = linkedMapOf<String, ChessOpening>()
     
-    // ECO code hierarchy for parent-child relationships
     private val ecoHierarchy = mapOf(
-        "C60" to listOf("C65", "C68", "C77", "C89", "C95"), // Ruy Lopez variations
-        "C50" to listOf("C51", "C53", "C55"), // Italian Game variations
-        "B20" to listOf("B22", "B25", "B33", "B35", "B70", "B80", "B90"), // Sicilian variations
-        "D20" to listOf("D26", "D30", "D41", "D63"), // Queen's Gambit variations
-        "E60" to listOf("E68", "E81", "E97"), // King's Indian variations
-        "E20" to listOf("E32"), // Nimzo-Indian variations
-        "A10" to listOf("A15", "A20", "A30") // English Opening variations
+        "C60" to listOf("C65", "C68", "C77", "C89", "C95"),
+        "C50" to listOf("C51", "C53", "C55"),
+        "B20" to listOf("B22", "B25", "B33", "B35", "B70", "B80", "B90"),
+        "D20" to listOf("D26", "D30", "D41", "D63"),
+        "E60" to listOf("E68", "E81", "E97"),
+        "E20" to listOf("E32"),
+        "A10" to listOf("A15", "A20", "A30")
     )
     
     fun detectOpening(moveHistory: List<DetailedMove>): OpeningInfo {
@@ -40,14 +39,12 @@ class OpeningDetector {
             return OpeningInfo(null)
         }
         
-        // Convert detailed moves to SAN notation
         val sanMoves = moveHistory.map { detailedMove ->
             detailedMove.san.ifEmpty {
                 convertMoveToSimpleNotation(detailedMove.move)
             }
         }
         
-        // Check transposition cache first
         val positionKey = sanMoves.joinToString(",")
         transpositionCache[positionKey]?.let { cachedOpening ->
             return createOpeningInfo(cachedOpening, sanMoves, true)
@@ -65,7 +62,6 @@ class OpeningDetector {
             return transpositionResult
         }
         
-        // Fallback: partial matching with parent openings
         return detectPartialMatch(sanMoves)
     }
     
@@ -98,14 +94,12 @@ class OpeningDetector {
     
     private fun detectTranspositions(sanMoves: List<String>): OpeningInfo {
         for (opening in openingDatabase) {
-            // Check each transposition sequence
             for (transposition in opening.transpositions) {
                 if (isTransposition(sanMoves, transposition)) {
                     return createOpeningInfo(opening, sanMoves, true)
                 }
             }
             
-            // Check if current sequence could transpose to this opening
             if (couldTransposeTo(sanMoves, opening.moves)) {
                 return createOpeningInfo(opening, sanMoves, true)
             }
@@ -118,7 +112,6 @@ class OpeningDetector {
         var bestMatch: ChessOpening? = null
         var longestMatch = 0
         
-        // Prioritize main lines and popular openings for partial matches
         val sortedOpenings = openingDatabase.sortedWith(
             compareByDescending<ChessOpening> { it.popularity }
                 .thenBy { if (it.isMainLine) 0 else 1 }
@@ -157,7 +150,6 @@ class OpeningDetector {
     }
     
     private fun isTransposition(gameMoves: List<String>, transpositionMoves: List<String>): Boolean {
-        // Check if the game moves contain all the transposition moves in any order
         if (gameMoves.size < transpositionMoves.size) return false
         
         val gameMovesSet = gameMoves.toSet()
@@ -167,17 +159,15 @@ class OpeningDetector {
     }
     
     private fun couldTransposeTo(gameMoves: List<String>, targetMoves: List<String>): Boolean {
-        // Simple heuristic: check if we have key moves that suggest this opening
         if (gameMoves.size < 3) return false
-        
-        val keyMoves = targetMoves.take(4)  // First 4 moves are usually characteristic
+
+        val keyMoves = targetMoves.take(4)
         val gameMovesSet = gameMoves.toSet()
         
         return keyMoves.count { it in gameMovesSet } >= keyMoves.size - 1
     }
     
     private fun getNextPopularMoves(opening: ChessOpening, currentMoves: List<String>): List<PopularMove> {
-        // Return theoretical next moves based on the opening
         val nextMoveIndex = currentMoves.size
         
         if (nextMoveIndex < opening.moves.size) {
@@ -185,14 +175,13 @@ class OpeningDetector {
             return listOf(
                 PopularMove(
                     move = nextMove,
-                    frequency = 85.0f,  // Main line frequency
+                    frequency = 85.0f,
                     performance = opening.statistics.whiteWinRate + opening.statistics.drawRate * 0.5f,
                     isTheoretical = true
                 )
             )
         }
         
-        // Find continuations from other openings that start with this one
         val continuations = findContinuations(currentMoves)
         return continuations.take(3)
     }
@@ -200,7 +189,6 @@ class OpeningDetector {
     private fun findContinuations(currentMoves: List<String>): List<PopularMove> {
         val continuations = mutableListOf<PopularMove>()
         
-        // Look for openings that extend this one
         for (other in openingDatabase) {
             if (other.moves.size > currentMoves.size && 
                 other.moves.take(currentMoves.size) == currentMoves) {
@@ -225,10 +213,7 @@ class OpeningDetector {
     }
     
     private fun calculatePositionEvaluation(opening: ChessOpening, moveCount: Int): Float {
-        // Estimate position evaluation based on opening statistics
         val baseEval = (opening.statistics.whiteWinRate - opening.statistics.blackWinRate) / 100f
-        
-        // Adjust based on opening phase (early moves more neutral)
         val phaseAdjustment = when {
             moveCount <= 3 -> 0.8f
             moveCount <= 6 -> 0.9f
@@ -241,7 +226,7 @@ class OpeningDetector {
     
     private fun determineVariation(opening: ChessOpening, moveNumber: Int): String? {
         return when {
-            moveNumber == opening.moves.size -> null  // Exact match
+            moveNumber == opening.moves.size -> null
             moveNumber < opening.moves.size -> "In progress"
             else -> "Extended"
         }
@@ -263,7 +248,6 @@ class OpeningDetector {
     }
     
     private fun convertMoveToSimpleNotation(move: ChessMove): String {
-        // Simple conversion for basic piece moves
         return when (move.piece) {
             is ChessPiece.Pawn -> {
                 if (move.capturedPiece != null) {
@@ -277,7 +261,6 @@ class OpeningDetector {
             is ChessPiece.Rook -> "R${move.to}"
             is ChessPiece.Queen -> "Q${move.to}"
             is ChessPiece.King -> {
-                // Check for castling
                 when {
                     move.from.file == 'e' && move.to.file == 'g' -> "O-O"
                     move.from.file == 'e' && move.to.file == 'c' -> "O-O-O"
@@ -288,13 +271,11 @@ class OpeningDetector {
     }
     
     private fun normalizeMove(move: String): String {
-        // Remove check/checkmate symbols and normalize notation
         return move.replace(Regex("[+#!?]"), "").trim()
     }
     
     fun getAllOpenings(): List<ChessOpening> = openingDatabase
     
-    // Advanced features for opening explorer
     fun getOpeningsByCategory(category: OpeningCategory): List<ChessOpening> {
         return openingDatabase.filter { it.category == category }
             .sortedByDescending { it.popularity }
@@ -401,7 +382,6 @@ class OpeningDetector {
     private fun calculateDiversityScore(openingCounts: Map<String, Int>, totalGames: Int): Float {
         if (totalGames == 0) return 0f
         
-        // Shannon diversity index
         val entropy = openingCounts.values.sumOf { count ->
             val p = count.toDouble() / totalGames
             if (p > 0) -p * kotlin.math.ln(p) else 0.0
@@ -417,5 +397,5 @@ data class OpeningRepertoireAnalysis(
     val categoryDistribution: Map<OpeningCategory, Int>,
     val difficultyDistribution: Map<OpeningDifficulty, Int>,
     val averageDifficulty: Float,
-    val diversityScore: Float  // 0-1, higher = more diverse
+    val diversityScore: Float
 )

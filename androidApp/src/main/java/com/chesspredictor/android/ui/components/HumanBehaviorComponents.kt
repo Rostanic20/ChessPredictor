@@ -20,9 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chesspredictor.domain.entities.*
 
-/**
- * Displays the engine's current emotional state with appropriate icon and color
- */
 @Composable
 fun EmotionalStateDisplay(
     emotionalState: EmotionalState,
@@ -38,7 +35,7 @@ fun EmotionalStateDisplay(
         EmotionalState.PRESSURED -> Triple(Icons.Default.Timer, Color(0xFFFF5722), "Under Pressure")
         EmotionalState.SATISFIED -> Triple(Icons.Default.CheckCircle, Color(0xFF8BC34A), "Satisfied")
     }
-    
+
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
@@ -66,9 +63,6 @@ fun EmotionalStateDisplay(
     }
 }
 
-/**
- * Displays move commentary from the engine
- */
 @Composable
 fun MoveCommentaryDisplay(
     commentary: MoveCommentary?,
@@ -106,14 +100,13 @@ fun MoveCommentaryDisplay(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
-                        
-                        // Confidence indicator
+
                         ConfidenceIndicator(
                             confidence = comment.confidence,
                             modifier = Modifier.size(12.dp)
                         )
                     }
-                    
+
                     Text(
                         text = comment.text,
                         style = MaterialTheme.typography.bodyMedium,
@@ -125,9 +118,6 @@ fun MoveCommentaryDisplay(
     }
 }
 
-/**
- * Shows when the engine is "thinking" with animated indicator
- */
 @Composable
 fun ThinkingProcessIndicator(
     isShowingThoughts: Boolean,
@@ -150,9 +140,8 @@ fun ThinkingProcessIndicator(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Animated thinking dots
                 ThinkingDots()
-                
+
                 Text(
                     text = "Thinking...",
                     style = MaterialTheme.typography.bodySmall,
@@ -163,13 +152,10 @@ fun ThinkingProcessIndicator(
     }
 }
 
-/**
- * Animated dots to show thinking process
- */
 @Composable
 private fun ThinkingDots() {
     val infiniteTransition = rememberInfiniteTransition(label = "thinking")
-    
+
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         repeat(3) { index ->
             val alpha by infiniteTransition.animateFloat(
@@ -181,7 +167,7 @@ private fun ThinkingDots() {
                 ),
                 label = "dot$index"
             )
-            
+
             Box(
                 modifier = Modifier
                     .size(4.dp)
@@ -194,9 +180,6 @@ private fun ThinkingDots() {
     }
 }
 
-/**
- * Shows confidence level as a visual indicator
- */
 @Composable
 private fun ConfidenceIndicator(
     confidence: Float,
@@ -208,7 +191,7 @@ private fun ConfidenceIndicator(
         confidence >= 0.4f -> Color(0xFFF44336)
         else -> Color(0xFF9E9E9E)
     }
-    
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
@@ -216,9 +199,6 @@ private fun ConfidenceIndicator(
     )
 }
 
-/**
- * Combined panel showing all human behavior features
- */
 @Composable
 fun HumanBehaviorPanel(
     emotionalState: EmotionalState,
@@ -236,16 +216,14 @@ fun HumanBehaviorPanel(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         EmotionalStateDisplay(emotionalState = emotionalState)
-        
+
         ThinkingProcessIndicator(isShowingThoughts = isShowingThoughts)
-        
+
         MoveCommentaryDisplay(commentary = commentary)
     }
 }
-
-// Helper functions
 
 @Composable
 private fun getCommentaryBackgroundColor(type: CommentaryType): Color {

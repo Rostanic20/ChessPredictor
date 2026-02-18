@@ -7,15 +7,6 @@ import com.chesspredictor.domain.entities.PatternType
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TacticalPattern
 
-/**
- * Detects fork patterns where one piece attacks multiple enemy pieces simultaneously.
- * 
- * Types of forks detected:
- * - Knight forks: Knight attacking 2+ pieces
- * - Pawn forks: Pawn attacking exactly 2 pieces
- * - Royal forks: Any fork involving the king
- * - Double attacks: Other pieces attacking 2+ pieces
- */
 class ForkDetector : PatternDetector {
 
     companion object {
@@ -51,10 +42,7 @@ class ForkDetector : PatternDetector {
     ): TacticalPattern? {
         val enemyPiecesAttacked = findAttackedEnemyPieces(square, piece, gameState)
         
-        // Fork requires attacking at least 2 pieces
         if (enemyPiecesAttacked.size < 2) return null
-        
-        // Pawn forks must attack exactly 2 pieces
         if (piece is ChessPiece.Pawn && enemyPiecesAttacked.size != 2) return null
         
         return createForkPattern(square, piece, enemyPiecesAttacked, gameState)
@@ -121,7 +109,6 @@ class ForkDetector : PatternDetector {
         val targetValues = targets.sumOf { BoardUtils.getPieceValue(it.second) }
         val attackerValue = BoardUtils.getPieceValue(attacker)
         
-        // Net gain if the attacker is captured
         return targetValues - attackerValue
     }
     

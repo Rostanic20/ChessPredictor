@@ -11,8 +11,8 @@ data class ChessBoard(
 )
 
 data class Square(
-    val file: Char, // a-h
-    val rank: Int   // 1-8
+    val file: Char,
+    val rank: Int
 ) {
     init {
         require(file in 'a'..'h') { "File must be between a and h" }

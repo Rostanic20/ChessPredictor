@@ -15,14 +15,14 @@ interface ChessEngineDataSource {
 }
 
 data class EngineAnalysis(
-    val bestMove: String, // UCI format e.g. "e2e4"
+    val bestMove: String,
     val evaluation: Float,
     val depth: Int,
     val nodes: Long,
     val time: Long,
     val principalVariation: List<String> = emptyList(),
-    val mate: Int? = null, // Number of moves to mate (positive = white mates, negative = black mates)
-    val alternativeMoves: List<String> = emptyList(), // Alternative good moves from MultiPV
-    val nps: Long = 0, // Nodes per second
-    val hashfull: Int = 0 // Hash table fullness percentage
+    val mate: Int? = null,
+    val alternativeMoves: List<String> = emptyList(),
+    val nps: Long = 0,
+    val hashfull: Int = 0
 )

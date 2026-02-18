@@ -41,7 +41,7 @@ fun ExportGameDialog(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -69,17 +69,16 @@ fun ExportGameDialog(
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Format selection
+
                 Text(
                     text = "Select Format",
                     style = MaterialTheme.typography.titleMedium
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Column(Modifier.selectableGroup()) {
                     ExportFormat.values().forEach { format ->
                         Row(
@@ -116,10 +115,9 @@ fun ExportGameDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Export button
+
                 Button(
                     onClick = {
                         exportedContent = viewModel.exportGame(selectedFormat)
@@ -130,11 +128,10 @@ fun ExportGameDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Export")
                 }
-                
-                // Display exported content
+
                 exportedContent?.let { content ->
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -150,7 +147,7 @@ fun ExportGameDialog(
                                 style = MaterialTheme.typography.titleSmall,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
-                            
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -167,19 +164,17 @@ fun ExportGameDialog(
                                         .padding(8.dp)
                                 )
                             }
-                            
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                // Copy button
                                 OutlinedButton(
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(content))
                                         scope.launch {
-                                            // Show snackbar or toast
                                         }
                                     }
                                 ) {
@@ -187,8 +182,7 @@ fun ExportGameDialog(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Copy")
                                 }
-                                
-                                // Share button
+
                                 OutlinedButton(
                                     onClick = {
                                         val shareIntent = Intent().apply {
@@ -224,10 +218,9 @@ fun ImportGameDialog(
     var importContent by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    
+
     val context = LocalContext.current
-    
-    // File picker launcher
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -241,12 +234,11 @@ fun ImportGameDialog(
                         importContent = it
                     }
                 } catch (e: Exception) {
-                    // Handle error
                 }
             }
         }
     }
-    
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -274,17 +266,16 @@ fun ImportGameDialog(
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Format selection
+
                 Text(
                     text = "Select Format",
                     style = MaterialTheme.typography.titleMedium
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Column(Modifier.selectableGroup()) {
                     ExportFormat.values().forEach { format ->
                         Row(
@@ -321,10 +312,9 @@ fun ImportGameDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Input options
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -340,7 +330,7 @@ fun ImportGameDialog(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Paste")
                     }
-                    
+
                     OutlinedButton(
                         onClick = {
                             filePickerLauncher.launch("text/*")
@@ -351,10 +341,9 @@ fun ImportGameDialog(
                         Text("File")
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Content input field
+
                 OutlinedTextField(
                     value = importContent,
                     onValueChange = { importContent = it },
@@ -368,10 +357,9 @@ fun ImportGameDialog(
                     ),
                     maxLines = Int.MAX_VALUE
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                // Import button
+
                 Button(
                     onClick = {
                         if (importContent.isNotBlank()) {

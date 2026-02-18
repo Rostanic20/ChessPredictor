@@ -71,9 +71,6 @@ class ErrorStateManager {
     }
 }
 
-/**
- * Extension function to safely execute operations and report errors
- */
 inline fun <T> ErrorStateManager.safeExecute(
     errorFactory: (Throwable) -> ChessError = { ChessError.UnknownError(cause = it) },
     block: () -> T
@@ -86,9 +83,6 @@ inline fun <T> ErrorStateManager.safeExecute(
     }
 }
 
-/**
- * Extension function to safely execute suspend operations and report errors
- */
 suspend inline fun <T> ErrorStateManager.safeExecuteSuspend(
     errorFactory: (Throwable) -> ChessError = { ChessError.UnknownError(cause = it) },
     block: () -> T

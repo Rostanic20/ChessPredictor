@@ -23,9 +23,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.math.abs
 
-/**
- * Handles game import and export in various formats
- */
 class ImportExportGameUseCase(
     private val chessRulesEngine: ChessRulesEngine = ChessRulesEngine()
 ) {
@@ -64,7 +61,6 @@ class ImportExportGameUseCase(
     private fun exportAsPGN(gameState: GameState, additionalData: ExportAdditionalData?): String {
         val pgn = StringBuilder()
         
-        // Headers
         pgn.appendLine("[Event \"${additionalData?.event ?: "Chess Game"}\"]")
         pgn.appendLine("[Site \"${additionalData?.site ?: "ChessPredictor App"}\"]")
         pgn.appendLine("[Date \"${additionalData?.date ?: getCurrentDate()}\"]")
@@ -73,13 +69,11 @@ class ImportExportGameUseCase(
         pgn.appendLine("[Black \"${additionalData?.black ?: "Engine"}\"]")
         pgn.appendLine("[Result \"${getGameResult(gameState)}\"]")
         
-        // Starting position if not standard
         if (gameState.toFen() != ChessConstants.STARTING_POSITION_FEN) {
             pgn.appendLine("[FEN \"${gameState.toFen()}\"]")
             pgn.appendLine("[SetUp \"1\"]")
         }
         
-        // Add custom tags for ChessPredictor
         additionalData?.let { data ->
             data.whiteAccuracy?.let { pgn.appendLine("[WhiteAccuracy \"$it\"]") }
             data.blackAccuracy?.let { pgn.appendLine("[BlackAccuracy \"$it\"]") }
@@ -90,7 +84,6 @@ class ImportExportGameUseCase(
         
         pgn.appendLine()
         
-        // Moves
         gameState.moveHistory.forEachIndexed { index, move ->
             if (index % 2 == 0) {
                 pgn.append("${(index / 2) + 1}. ")
@@ -98,12 +91,10 @@ class ImportExportGameUseCase(
             
             pgn.append(move.san)
             
-            // Add comments if available
             additionalData?.moveComments?.get(index)?.let { comment ->
                 pgn.append(" {$comment}")
             }
             
-            // Add evaluation if available
             additionalData?.evaluations?.getOrNull(index + 1)?.let { eval ->
                 val evalStr = (eval / 100f).let { value ->
                     val rounded = (value * 100).toInt() / 100f
@@ -115,7 +106,6 @@ class ImportExportGameUseCase(
             pgn.append(" ")
         }
         
-        // Result
         pgn.append(getGameResult(gameState))
         
         return pgn.toString().trim()
@@ -187,7 +177,6 @@ class ImportExportGameUseCase(
     }
     
     private fun importFromPGN(pgn: String): Result<ImportedGameData> {
-        // Basic PGN parser
         val headers = mutableMapOf<String, String>()
         val moveText = StringBuilder()
         var inHeaders = true
@@ -195,7 +184,6 @@ class ImportExportGameUseCase(
         pgn.lines().forEach { line ->
             when {
                 line.startsWith("[") && line.endsWith("]") -> {
-                    // Parse header
                     val match = Regex("\\[(\\w+)\\s+\"([^\"]+)\"\\]").find(line)
                     match?.let {
                         headers[it.groupValues[1]] = it.groupValues[2]
@@ -210,11 +198,9 @@ class ImportExportGameUseCase(
             }
         }
         
-        // Parse starting position
         val startingFen = headers["FEN"] ?: ChessConstants.STARTING_POSITION_FEN
         var gameState = chessRulesEngine.parseGameState(startingFen)
         
-        // Parse moves
         val moves = mutableListOf<DetailedMove>()
         val movePattern = Regex("\\d+\\.\\s*([^\\s]+)\\s*([^\\s]+)?")
         
@@ -222,7 +208,6 @@ class ImportExportGameUseCase(
             val whiteSan = matchResult.groupValues[1]
             val blackSan = matchResult.groupValues[2].takeIf { it.isNotEmpty() }
             
-            // Process white move
             if (whiteSan.isNotEmpty() && !whiteSan.contains("*") && !whiteSan.contains("-")) {
                 val move = parseSANMove(whiteSan, gameState)
                 if (move != null) {
@@ -234,7 +219,6 @@ class ImportExportGameUseCase(
                 }
             }
             
-            // Process black move
             blackSan?.let { san ->
                 if (!san.contains("*") && !san.contains("-")) {
                     val move = parseSANMove(san, gameState)
@@ -249,7 +233,6 @@ class ImportExportGameUseCase(
             }
         }
         
-        // Extract additional data
         val additionalData = ExportAdditionalData(
             event = headers["Event"],
             site = headers["Site"],
@@ -275,14 +258,9 @@ class ImportExportGameUseCase(
     private fun importFromJSON(jsonStr: String): Result<ImportedGameData> {
         val exportedGame = json.decodeFromString<ExportedGame>(jsonStr)
         
-        // Start from the position in the JSON
         var gameState = chessRulesEngine.parseGameState(exportedGame.gameData.fen)
-        
-        // If we have moves, replay from starting position
         if (exportedGame.gameData.moves.isNotEmpty()) {
-            // Determine starting position
             val startingFen = if (exportedGame.gameData.currentPly > exportedGame.gameData.moves.size) {
-                // Game started from a custom position
                 exportedGame.gameData.fen
             } else {
                 ChessConstants.STARTING_POSITION_FEN
@@ -290,7 +268,6 @@ class ImportExportGameUseCase(
             
             gameState = chessRulesEngine.parseGameState(startingFen)
             
-            // Replay moves
             for (exportedMove in exportedGame.gameData.moves) {
                 val fromSquare = Square.fromString(exportedMove.from)
                 val piece = gameState.board[fromSquare] ?: continue
@@ -319,7 +296,6 @@ class ImportExportGameUseCase(
             }
         }
         
-        // Convert to additional data
         val additionalData = ExportAdditionalData(
             event = exportedGame.gameData.event,
             site = exportedGame.gameData.site,
@@ -344,7 +320,7 @@ class ImportExportGameUseCase(
                 KeyMoment(
                     moveNumber = km.moveNumber,
                     description = km.description,
-                    evaluationSwing = 0f, // Not stored in export
+                    evaluationSwing = 0f,
                     type = KeyMomentType.valueOf(km.type)
                 )
             }
@@ -368,12 +344,8 @@ class ImportExportGameUseCase(
     }
     
     private fun parseSANMove(san: String, gameState: GameState): ChessMove? {
-        // This is a simplified SAN parser - in production, you'd want a complete implementation
-        
-        // Get all legal moves
         val legalMoves = chessRulesEngine.getLegalMoves(gameState)
         
-        // Find the move that matches the SAN
         return legalMoves.find { move ->
             val moveState = chessRulesEngine.makeMove(gameState, move)
             moveState?.moveHistory?.lastOrNull()?.san == san

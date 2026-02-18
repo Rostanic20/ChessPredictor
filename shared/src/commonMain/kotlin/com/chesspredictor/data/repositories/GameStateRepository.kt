@@ -23,5 +23,5 @@ data class SavedGameState(
     val isFlipped: Boolean,
     val showCoordinates: Boolean,
     val timestamp: Long = TimeProvider.currentTimeMillis(),
-    val positionEvaluations: List<Float> = listOf() // Track evaluations for accuracy
+    val positionEvaluations: List<Float> = listOf()
 )

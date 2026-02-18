@@ -23,7 +23,6 @@ object ChessBoardUtils {
                     ChessColor.WHITE -> whiteKing = square
                     ChessColor.BLACK -> blackKing = square
                 }
-                // Early exit if both found
                 if (whiteKing != null && blackKing != null) break
             }
         }
@@ -70,7 +69,6 @@ object ChessBoardUtils {
         
         board.forEach { (_, piece) ->
             val value = com.chesspredictor.domain.constants.PieceValues.getValue(piece)
-            // Don't count kings in material balance
             if (piece !is ChessPiece.King) {
                 when (piece.color) {
                     ChessColor.WHITE -> whiteValue += value
@@ -99,41 +97,27 @@ object ChessBoardUtils {
         return square.file in 'c'..'f' && square.rank in 3..6
     }
     
-    /**
-     * Get the rank for a color's back rank.
-     */
     fun getBackRank(color: ChessColor): Int {
         return if (color == ChessColor.WHITE) 1 else 8
     }
     
-    /**
-     * Get the rank for a color's pawn starting rank.
-     */
     fun getPawnStartRank(color: ChessColor): Int {
         return if (color == ChessColor.WHITE) 2 else 7
     }
     
-    /**
-     * Get pawn direction for a color.
-     */
     fun getPawnDirection(color: ChessColor): Int {
         return if (color == ChessColor.WHITE) 1 else -1
     }
     
-    /**
-     * Check if a pawn is passed (no enemy pawns can block or capture it).
-     */
     fun isPassedPawn(pawnSquare: Square, pawnColor: ChessColor, board: Map<Square, ChessPiece>): Boolean {
         val enemyColor = pawnColor.opposite()
         
-        // Check files that could block or capture (current file and adjacent)
         val filesToCheck = listOf(
             pawnSquare.file,
             (pawnSquare.file - 1).toChar(),
             (pawnSquare.file + 1).toChar()
         ).filter { it in 'a'..'h' }
         
-        // Check all ranks ahead of the pawn
         val ranksToCheck = if (pawnColor == ChessColor.WHITE) {
             (pawnSquare.rank + 1)..8
         } else {
@@ -154,9 +138,6 @@ object ChessBoardUtils {
     }
 }
 
-/**
- * Data class for piece counts.
- */
 data class PieceCount(
     val counts: Map<ChessColor, Map<String, Int>>
 ) {
@@ -165,15 +146,12 @@ data class PieceCount(
     }
 }
 
-/**
- * Data class for material information.
- */
 data class MaterialInfo(
     val whiteMaterial: Int,
     val blackMaterial: Int,
     val difference: Int
 ) {
-    val isBalanced: Boolean = kotlin.math.abs(difference) < 100 // Less than 1 pawn
+    val isBalanced: Boolean = kotlin.math.abs(difference) < 100
     val advantage: ChessColor? = when {
         difference > 0 -> ChessColor.WHITE
         difference < 0 -> ChessColor.BLACK

@@ -5,17 +5,9 @@ import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
 
-/**
- * Utility class for chess board operations used in pattern detection.
- * Provides common functionality for move generation, attack detection, and piece evaluation.
- */
 class BoardUtils {
     
     companion object {
-        /**
-         * Gets all squares attacked by a piece from a given position.
-         * Does not consider move legality, only attack patterns.
-         */
         fun getSquaresAttackedBy(from: Square, piece: ChessPiece, gameState: GameState): List<Square> {
             return when (piece) {
                 is ChessPiece.Pawn -> getPawnAttacks(from, piece.color)
@@ -27,19 +19,12 @@ class BoardUtils {
             }.filter { it.isValid() }
         }
         
-        /**
-         * Gets all possible moves for a piece from a given position.
-         * Filters out moves to squares occupied by friendly pieces.
-         */
         fun getPossibleMoves(from: Square, piece: ChessPiece, gameState: GameState): List<Square> {
             return getSquaresAttackedBy(from, piece, gameState).filter { target ->
                 gameState.board[target]?.color != piece.color
             }
         }
         
-        /**
-         * Finds all pieces of a given color that attack a specific square.
-         */
         fun getAttackers(target: Square, byColor: ChessColor, gameState: GameState): List<Pair<Square, ChessPiece>> {
             return gameState.board.filter { (sq, piece) ->
                 piece.color == byColor && 
@@ -47,35 +32,20 @@ class BoardUtils {
             }.map { it.key to it.value }
         }
         
-        /**
-         * Checks if a piece can pin other pieces (bishops, rooks, queens).
-         */
         fun canPiecePin(piece: ChessPiece): Boolean {
             return piece is ChessPiece.Bishop || piece is ChessPiece.Rook || piece is ChessPiece.Queen
         }
         
-        /**
-         * Checks if a piece can skewer other pieces (bishops, rooks, queens).
-         */
         fun canPieceSkewer(piece: ChessPiece): Boolean = canPiecePin(piece)
         
-        /**
-         * Determines if a piece is considered valuable (king, queen, rook).
-         */
         fun isValuablePiece(piece: ChessPiece): Boolean {
             return piece is ChessPiece.King || piece is ChessPiece.Queen || piece is ChessPiece.Rook
         }
         
-        /**
-         * Gets the standard material value of a piece.
-         */
         fun getPieceValue(piece: ChessPiece): Int {
             return com.chesspredictor.domain.constants.PieceValues.getValue(piece)
         }
         
-        /**
-         * Gets a human-readable name for a piece.
-         */
         fun getPieceName(piece: ChessPiece): String {
             return when (piece) {
                 is ChessPiece.Pawn -> "Pawn"
@@ -87,10 +57,6 @@ class BoardUtils {
             }
         }
         
-        /**
-         * Gets all attack lines for sliding pieces (bishop, rook, queen).
-         * Returns lists of squares in each direction until blocked.
-         */
         fun getAttackLines(from: Square, piece: ChessPiece, gameState: GameState): List<List<Square>> {
             val lines = mutableListOf<List<Square>>()
             val directions = when (piece) {
@@ -107,7 +73,6 @@ class BoardUtils {
                 while (current != null && current.isValid()) {
                     line.add(current)
                     if (gameState.board.containsKey(current)) {
-                        // Add one more square if there's another piece behind
                         val next = current.move(direction.first, direction.second)
                         if (next?.isValid() == true && gameState.board.containsKey(next)) {
                             line.add(next)
@@ -122,8 +87,6 @@ class BoardUtils {
             
             return lines
         }
-        
-        // Private helper functions
         
         private fun getPawnAttacks(from: Square, color: ChessColor): List<Square> {
             val direction = if (color == ChessColor.WHITE) 1 else -1
@@ -172,7 +135,6 @@ class BoardUtils {
             return moves
         }
         
-        // Direction constants
         private val BISHOP_DIRECTIONS = listOf(
             Pair(1, 1), Pair(1, -1), Pair(-1, 1), Pair(-1, -1)
         )
@@ -195,7 +157,6 @@ class BoardUtils {
     }
 }
 
-// Extension functions for Square
 fun Square.move(fileOffset: Int, rankOffset: Int): Square? {
     val newFile = (file + fileOffset).toChar()
     val newRank = rank + rankOffset

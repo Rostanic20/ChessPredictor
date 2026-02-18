@@ -3,18 +3,12 @@ package com.chesspredictor.domain.entities
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-/**
- * Supported game export formats
- */
 enum class ExportFormat {
-    PGN,        // Standard chess notation
-    JSON,       // Full game data with analysis
-    FEN         // Current position only
+    PGN,
+    JSON,
+    FEN
 }
 
-/**
- * Represents an exported game in JSON format with all metadata
- */
 @Serializable
 data class ExportedGame(
     val version: Int = 1,
@@ -32,7 +26,7 @@ data class GameData(
     val round: String = "-",
     val white: String = "Player",
     val black: String = "Engine",
-    val result: String = "*",  // * means ongoing, 1-0 white wins, 0-1 black wins, 1/2-1/2 draw
+    val result: String = "*",
     val fen: String,
     val moves: List<ExportedMove>,
     val currentPly: Int,

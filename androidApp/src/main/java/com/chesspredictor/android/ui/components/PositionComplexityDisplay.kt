@@ -37,7 +37,6 @@ fun PositionComplexityCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -59,28 +58,25 @@ fun PositionComplexityCard(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                
+
                 ComplexityBadge(complexity.overallComplexity)
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
-            // Complexity bars
+
             ComplexityMetrics(complexity)
-            
+
             if (complexity.criticalFactors.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 CriticalFactorsDisplay(complexity.criticalFactors)
             }
-            
-            // King safety indicator
-            if (complexity.kingDanger.whiteKingSafety < 50f || 
+
+            if (complexity.kingDanger.whiteKingSafety < 50f ||
                 complexity.kingDanger.blackKingSafety < 50f) {
                 Spacer(modifier = Modifier.height(12.dp))
                 KingSafetyIndicator(complexity.kingDanger)
             }
-            
-            // Time importance
+
             if (complexity.timeImportance != TimeImportance.MODERATE) {
                 Spacer(modifier = Modifier.height(8.dp))
                 TimeImportanceIndicator(complexity.timeImportance)
@@ -98,7 +94,7 @@ private fun ComplexityBadge(level: ComplexityLevel) {
         ComplexityLevel.HIGH -> Color(0xFFFF9800) to Color.White
         ComplexityLevel.EXTREME -> Color(0xFFF44336) to Color.White
     }
-    
+
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = backgroundColor,
@@ -158,17 +154,17 @@ private fun ComplexityBar(
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.width(60.dp)
         )
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -184,7 +180,7 @@ private fun ComplexityBar(
                     else -> Color(0xFF4CAF50)
                 }
             )
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth(animatedValue)
@@ -192,9 +188,9 @@ private fun ComplexityBar(
                     .background(color)
             )
         }
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         Text(
             text = "${value.toInt()}",
             style = MaterialTheme.typography.bodySmall,
@@ -212,7 +208,7 @@ private fun CriticalFactorsDisplay(factors: List<CriticalFactor>) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        
+
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             factors.chunked(2).forEach { rowFactors ->
                 Row(
@@ -239,7 +235,7 @@ private fun CriticalFactorChip(factor: CriticalFactor) {
         CriticalFactor.FORCED_SEQUENCE -> Icons.Default.PlayArrow to Color(0xFF9C27B0)
         else -> Icons.Default.Info to MaterialTheme.colorScheme.primary
     }
-    
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = color.copy(alpha = 0.1f),
@@ -275,7 +271,7 @@ private fun KingSafetyIndicator(kingDanger: KingDangerLevel) {
             color = ChessColor.WHITE,
             safety = kingDanger.whiteKingSafety
         )
-        
+
         KingSafetyDisplay(
             color = ChessColor.BLACK,
             safety = kingDanger.blackKingSafety
@@ -309,20 +305,20 @@ private fun KingSafetyDisplay(
                         } else Modifier
                     )
             )
-            
+
             Text(
                 text = "${color.name} King",
                 style = MaterialTheme.typography.labelSmall
             )
         }
-        
+
         val safetyColor = when {
             safety < 30 -> Color(0xFFF44336)
             safety < 50 -> Color(0xFFFF9800)
             safety < 70 -> Color(0xFFFFC107)
             else -> Color(0xFF4CAF50)
         }
-        
+
         Text(
             text = "${safety.toInt()}% safe",
             color = safetyColor,
@@ -361,7 +357,7 @@ private fun TimeImportanceIndicator(importance: TimeImportance) {
             },
             modifier = Modifier.size(16.dp)
         )
-        
+
         Text(
             text = when (importance) {
                 TimeImportance.CRITICAL -> "Time is critical - think fast but accurately!"
@@ -374,4 +370,3 @@ private fun TimeImportanceIndicator(importance: TimeImportance) {
         )
     }
 }
-

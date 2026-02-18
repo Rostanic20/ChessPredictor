@@ -8,13 +8,9 @@ class MoveValidator(
 ) {
 
     fun isMoveLegal(gameState: GameState, move: ChessMove): Boolean {
-        // Check if it's the correct player's turn
         if (move.piece.color != gameState.turn) return false
-        
-        // Check if the piece is actually on the from square
+
         if (gameState.board[move.from] != move.piece) return false
-        
-        // Check if the move is in the list of legal moves
         val legalMoves = moveGenerator.generateLegalMoves(gameState)
         return legalMoves.any { legalMove ->
             legalMove.piece == move.piece &&

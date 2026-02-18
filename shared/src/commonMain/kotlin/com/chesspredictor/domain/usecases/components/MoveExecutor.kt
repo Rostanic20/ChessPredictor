@@ -18,25 +18,19 @@ class MoveExecutor {
         val newMoveHistory = gameState.moveHistory.toMutableList()
         val newCapturedPieces = gameState.capturedPieces.toMutableList()
         
-        // Handle captured piece
         val capturedPiece = move.capturedPiece ?: gameState.board[move.to]
         if (capturedPiece != null) {
             newCapturedPieces.add(capturedPiece)
         }
         
-        // Remove piece from source
         newBoard.remove(move.from)
-        
-        // Place piece on destination (or promoted piece)
         val finalPiece = move.promotion ?: move.piece
         newBoard[move.to] = finalPiece
         
-        // Handle special moves
         var newEnPassantSquare: Square? = null
         var castlingType: CastlingType? = null
         
         when {
-            // Castling - move the rook
             move.piece is ChessPiece.King && abs(move.from.file.code - move.to.file.code) == 2 -> {
                 val isKingside = move.to.file > move.from.file
                 val rookFromFile = if (isKingside) 'h' else 'a'
@@ -48,7 +42,6 @@ class MoveExecutor {
                     newBoard[Square(rookToFile, rank)] = rook
                 }
                 
-                // Set castling type
                 castlingType = when {
                     move.piece.color == ChessColor.WHITE && isKingside -> CastlingType.WHITE_KINGSIDE
                     move.piece.color == ChessColor.WHITE && !isKingside -> CastlingType.WHITE_QUEENSIDE
@@ -57,7 +50,6 @@ class MoveExecutor {
                 }
             }
             
-            // En passant capture - remove the captured pawn
             move.piece is ChessPiece.Pawn && move.to == gameState.enPassantSquare -> {
                 val capturedPawnSquare = Square(move.to.file, move.from.rank)
                 val enPassantPawn = newBoard.remove(capturedPawnSquare)
@@ -66,30 +58,24 @@ class MoveExecutor {
                 }
             }
             
-            // Pawn double move - set en passant square
             move.piece is ChessPiece.Pawn && abs(move.from.rank - move.to.rank) == 2 -> {
                 newEnPassantSquare = Square(move.from.file, (move.from.rank + move.to.rank) / 2)
             }
         }
         
-        // Update castling rights
         val newCastlingRights = updateCastlingRights(gameState.castlingRights, move)
-        
-        // Calculate halfmove clock
         val newHalfmoveClock = if (move.piece is ChessPiece.Pawn || capturedPiece != null) {
             0
         } else {
             gameState.halfMoveClock + 1
         }
         
-        // Calculate fullmove number
         val newFullmoveNumber = if (gameState.turn == ChessColor.BLACK) {
             gameState.fullMoveNumber + 1
         } else {
             gameState.fullMoveNumber
         }
         
-        // Create detailed move for history
         val moveNumber = if (gameState.turn == ChessColor.WHITE) {
             gameState.fullMoveNumber
         } else {
@@ -104,8 +90,8 @@ class MoveExecutor {
             isCastling = castlingType,
             isEnPassant = move.piece is ChessPiece.Pawn && move.to == gameState.enPassantSquare,
             isPromotion = move.promotion != null,
-            isCheck = false, // Will be updated by caller
-            isCheckmate = false, // Will be updated by caller
+            isCheck = false,
+            isCheckmate = false,
             san = generateSimpleSAN(move),
             previousCastlingRights = gameState.castlingRights,
             previousEnPassantSquare = gameState.enPassantSquare,
@@ -129,7 +115,6 @@ class MoveExecutor {
     private fun updateCastlingRights(currentRights: CastlingRights, move: ChessMove): CastlingRights {
         var newRights = currentRights
         
-        // King moves remove all castling rights for that color
         if (move.piece is ChessPiece.King) {
             newRights = if (move.piece.color == ChessColor.WHITE) {
                 newRights.copy(whiteKingside = false, whiteQueenside = false)
@@ -138,7 +123,6 @@ class MoveExecutor {
             }
         }
         
-        // Rook moves remove castling rights for that side
         if (move.piece is ChessPiece.Rook) {
             when {
                 move.from == Square('a', 1) -> newRights = newRights.copy(whiteQueenside = false)
@@ -148,7 +132,6 @@ class MoveExecutor {
             }
         }
         
-        // Rook captures remove castling rights
         when (move.to) {
             Square('a', 1) -> newRights = newRights.copy(whiteQueenside = false)
             Square('h', 1) -> newRights = newRights.copy(whiteKingside = false)
@@ -160,7 +143,6 @@ class MoveExecutor {
     }
     
     private fun generateSimpleSAN(move: ChessMove): String {
-        // Basic SAN generation - can be improved later
         val piece = when (move.piece) {
             is ChessPiece.King -> "K"
             is ChessPiece.Queen -> "Q"
