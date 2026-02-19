@@ -275,7 +275,7 @@ class ChessBoardViewModel(
 
     private fun canSelectPiece(piece: ChessPiece, currentTurn: ChessColor): Boolean {
         return when (settingsManager.playMode.value) {
-            PlayMode.ANALYSIS, PlayMode.VS_HUMAN -> true
+            PlayMode.VS_HUMAN -> true
             PlayMode.VS_ENGINE -> piece.color == currentTurn
         }
     }

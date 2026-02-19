@@ -103,8 +103,7 @@ class SettingsManager {
 
 enum class PlayMode {
     VS_ENGINE,
-    VS_HUMAN,
-    ANALYSIS
+    VS_HUMAN
 }
 
 enum class PlayerColor {

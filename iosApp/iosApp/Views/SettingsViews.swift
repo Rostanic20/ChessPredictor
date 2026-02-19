@@ -26,11 +26,6 @@ struct PlayModeSelector: View {
                     isSelected: viewModel.playMode == .vsHuman,
                     action: { viewModel.setPlayMode(.vsHuman) }
                 )
-                PlayModeChip(
-                    label: "Analysis",
-                    isSelected: viewModel.playMode == .analysis,
-                    action: { viewModel.setPlayMode(.analysis) }
-                )
             }
         }
         .padding(16)

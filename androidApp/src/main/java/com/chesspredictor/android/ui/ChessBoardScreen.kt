@@ -631,7 +631,6 @@ fun PlayModeSelector(
                                 when (mode) {
                                     PlayMode.VS_ENGINE -> "vs AI"
                                     PlayMode.VS_HUMAN -> "vs Human"
-                                    PlayMode.ANALYSIS -> "Analysis"
                                 }
                             )
                         },

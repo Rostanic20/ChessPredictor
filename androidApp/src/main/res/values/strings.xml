@@ -15,8 +15,6 @@
     <!-- Game Modes -->
     <string name="vs_engine">vs Engine</string>
     <string name="vs_human">vs Human</string>
-    <string name="analysis_mode">Analysis</string>
-    
     <!-- Difficulty Levels -->
     <string name="difficulty_beginner">Beginner</string>
     <string name="difficulty_easy">Easy</string>
