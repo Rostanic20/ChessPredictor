@@ -8,7 +8,7 @@ Pod::Spec.new do |spec|
     spec.summary                  = 'ChessPredictor shared KMP module'
     spec.vendored_frameworks      = 'build/cocoapods/framework/shared.framework'
     spec.libraries                = 'c++'
-    spec.ios.deployment_target = '16.0'
+    spec.ios.deployment_target    = '16.0'
                 
                 
     if !Dir.exist?('build/cocoapods/framework/shared.framework') || Dir.empty?('build/cocoapods/framework/shared.framework')
@@ -21,6 +21,10 @@ Pod::Spec.new do |spec|
 
         Alternatively, proper pod installation is performed during Gradle sync in the IDE (if Podfile location is set)"
     end
+                
+    spec.xcconfig = {
+        'ENABLE_USER_SCRIPT_SANDBOXING' => 'NO',
+    }
                 
     spec.pod_target_xcconfig = {
         'KOTLIN_PROJECT_PATH' => ':shared',
@@ -38,7 +42,6 @@ Pod::Spec.new do |spec|
                   exit 0
                 fi
                 set -ev
-                export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
                 REPO_ROOT="$PODS_TARGET_SRCROOT"
                 "$REPO_ROOT/../gradlew" -p "$REPO_ROOT" $KOTLIN_PROJECT_PATH:syncFramework \
                     -Pkotlin.native.cocoapods.platform=$PLATFORM_NAME \

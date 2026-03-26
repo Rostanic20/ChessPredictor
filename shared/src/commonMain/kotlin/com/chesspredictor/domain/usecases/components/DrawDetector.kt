@@ -8,7 +8,7 @@ import com.chesspredictor.domain.entities.Square
 class DrawDetector {
 
     companion object {
-        private const val THREEFOLD_REPETITION_THRESHOLD = 2
+        private const val THREEFOLD_REPETITION_THRESHOLD = 3
         private const val FIFTY_MOVE_HALF_CLOCK = 100
     }
 

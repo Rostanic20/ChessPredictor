@@ -77,34 +77,79 @@ class IosGameStateRepositoryImpl : GameStateRepository {
 
     private fun serializeMoveHistory(moves: List<DetailedMove>): String {
         return moves.joinToString(";") { move ->
+            val pieceCode = encodePiece(move.move.piece)
             "${move.move.from.file}${move.move.from.rank}|" +
             "${move.move.to.file}${move.move.to.rank}|" +
-            move.san
+            "${move.san}|${pieceCode}|${move.moveNumber}|${move.isWhiteMove}"
         }
     }
 
     private fun deserializeMoveHistory(serialized: String): List<DetailedMove> {
         if (serialized.isEmpty()) return emptyList()
-        return serialized.split(";").mapNotNull { moveStr ->
+        return serialized.split(";").mapIndexedNotNull { index, moveStr ->
             try {
                 val parts = moveStr.split("|")
                 if (parts.size >= 3) {
                     val from = Square(parts[0][0], parts[0][1].toString().toInt())
                     val to = Square(parts[1][0], parts[1][1].toString().toInt())
+                    val san = parts[2]
+                    val isWhiteMove = if (parts.size >= 6) parts[5].toBoolean() else index % 2 == 0
+                    val piece = if (parts.size >= 4) decodePiece(parts[3]) else pieceFromSan(san, isWhiteMove)
+                    val moveNumber = if (parts.size >= 5) parts[4].toIntOrNull() ?: (index / 2 + 1) else (index / 2 + 1)
                     DetailedMove(
                         move = ChessMove(
                             from = from,
                             to = to,
-                            piece = ChessPiece.Pawn(ChessColor.WHITE)
+                            piece = piece
                         ),
-                        moveNumber = 1,
-                        isWhiteMove = true,
-                        san = parts[2],
+                        moveNumber = moveNumber,
+                        isWhiteMove = isWhiteMove,
+                        san = san,
                         previousCastlingRights = CastlingRights(true, true, true, true),
                         previousEnPassantSquare = null
                     )
                 } else null
             } catch (_: Exception) { null }
+        }
+    }
+
+    private fun encodePiece(piece: ChessPiece): String {
+        val type = when (piece) {
+            is ChessPiece.Pawn -> "P"
+            is ChessPiece.Knight -> "N"
+            is ChessPiece.Bishop -> "B"
+            is ChessPiece.Rook -> "R"
+            is ChessPiece.Queen -> "Q"
+            is ChessPiece.King -> "K"
+        }
+        return "$type${if (piece.color == ChessColor.WHITE) "W" else "B"}"
+    }
+
+    private fun decodePiece(code: String): ChessPiece {
+        val color = if (code.length >= 2 && code[1] == 'W') ChessColor.WHITE else ChessColor.BLACK
+        return when (code[0]) {
+            'N' -> ChessPiece.Knight(color)
+            'B' -> ChessPiece.Bishop(color)
+            'R' -> ChessPiece.Rook(color)
+            'Q' -> ChessPiece.Queen(color)
+            'K' -> ChessPiece.King(color)
+            else -> ChessPiece.Pawn(color)
+        }
+    }
+
+    private fun pieceFromSan(san: String, isWhiteMove: Boolean): ChessPiece {
+        val color = if (isWhiteMove) ChessColor.WHITE else ChessColor.BLACK
+        return when {
+            san.startsWith("O") -> ChessPiece.King(color)
+            san.isNotEmpty() && san[0] in "KQRBN" -> when (san[0]) {
+                'K' -> ChessPiece.King(color)
+                'Q' -> ChessPiece.Queen(color)
+                'R' -> ChessPiece.Rook(color)
+                'B' -> ChessPiece.Bishop(color)
+                'N' -> ChessPiece.Knight(color)
+                else -> ChessPiece.Pawn(color)
+            }
+            else -> ChessPiece.Pawn(color)
         }
     }
 

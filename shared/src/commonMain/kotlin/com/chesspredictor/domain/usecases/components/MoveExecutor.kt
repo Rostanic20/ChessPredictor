@@ -76,11 +76,7 @@ class MoveExecutor {
             gameState.fullMoveNumber
         }
         
-        val moveNumber = if (gameState.turn == ChessColor.WHITE) {
-            gameState.fullMoveNumber
-        } else {
-            gameState.fullMoveNumber
-        }
+        val moveNumber = gameState.fullMoveNumber
         
         val detailedMove = DetailedMove(
             move = move,

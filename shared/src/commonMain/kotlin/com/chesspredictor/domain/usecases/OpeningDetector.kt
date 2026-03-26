@@ -213,7 +213,7 @@ class OpeningDetector {
     }
     
     private fun calculatePositionEvaluation(opening: ChessOpening, moveCount: Int): Float {
-        val baseEval = (opening.statistics.whiteWinRate - opening.statistics.blackWinRate) / 100f
+        val baseEval = opening.statistics.whiteWinRate - opening.statistics.blackWinRate
         val phaseAdjustment = when {
             moveCount <= 3 -> 0.8f
             moveCount <= 6 -> 0.9f
