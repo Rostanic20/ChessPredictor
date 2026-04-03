@@ -1,5 +1,9 @@
 # ChessPredictor
 
+<p align="center">
+  <img src="screenshots/board.png" width="300" />
+</p>
+
 A chess app I built with **Kotlin Multiplatform** — runs on Android, iOS, and Web from a single shared codebase. You play against **Stockfish 17.1** with a twist: the AI can simulate human-like behavior instead of playing like a machine.
 
 ## How it works
