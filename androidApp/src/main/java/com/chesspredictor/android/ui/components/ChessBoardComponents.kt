@@ -37,7 +37,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -49,6 +51,7 @@ import com.chesspredictor.domain.entities.*
 import com.chesspredictor.presentation.viewmodels.ChessBoardUiState
 import com.chesspredictor.presentation.managers.PieceAnimation
 import com.chesspredictor.presentation.managers.AnimationType
+import kotlin.math.roundToInt
 
 @Composable
 fun ModernChessBoard(
@@ -823,6 +826,7 @@ fun AnimatedChessPiece(
 
     if (boardSize != IntSize.Zero) {
         val squareSize = boardSize.width / 8f
+        val squareSizeDp = with(LocalDensity.current) { squareSize.toDp() }
 
         Box(
             modifier = modifier
@@ -830,11 +834,13 @@ fun AnimatedChessPiece(
         ) {
             Box(
                 modifier = Modifier
-                    .size(squareSize.dp)
-                    .offset(
-                        x = (animatedOffset.x - squareSize / 2f).dp,
-                        y = (animatedOffset.y - squareSize / 2f).dp
-                    )
+                    .size(squareSizeDp)
+                    .offset {
+                        IntOffset(
+                            x = (animatedOffset.x - squareSize / 2f).roundToInt(),
+                            y = (animatedOffset.y - squareSize / 2f).roundToInt()
+                        )
+                    }
                     .scale(animatedScale)
                     .alpha(animatedAlpha),
                 contentAlignment = Alignment.Center
