@@ -1,38 +1,29 @@
 package com.chesspredictor.presentation.viewmodels
 
 import com.chesspredictor.di.AppModule
-import com.chesspredictor.domain.entities.CastlingRights
-import com.chesspredictor.domain.entities.ChessBoard
 import com.chesspredictor.domain.entities.ChessColor
-import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.EmotionalState
-import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.ExportFormat
-import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.MoveCommentary
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TimeControl
 import com.chesspredictor.data.repositories.GameStateRepository
-import com.chesspredictor.data.repositories.SavedGameState
 import com.chesspredictor.domain.usecases.ChessRulesEngine
 import com.chesspredictor.domain.usecases.OpeningDetector
 import com.chesspredictor.domain.usecases.ImportExportGameUseCase
-import com.chesspredictor.domain.usecases.ExportAdditionalData
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.presentation.managers.AnimationController
 import com.chesspredictor.presentation.managers.AnimationManager
 import com.chesspredictor.presentation.managers.EngineError
 import com.chesspredictor.presentation.managers.EngineManager
 import com.chesspredictor.presentation.managers.GameStateManager
-import com.chesspredictor.presentation.managers.GameStatus
 import com.chesspredictor.presentation.managers.HumanBehaviorManager
 import com.chesspredictor.presentation.managers.MoveController
 import com.chesspredictor.presentation.managers.MoveResult
-import com.chesspredictor.presentation.managers.PieceAnimation
 import com.chesspredictor.presentation.managers.PlayMode
 import com.chesspredictor.presentation.managers.PlayerColor
 import com.chesspredictor.presentation.managers.SettingsManager
@@ -48,15 +39,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 
 class ChessBoardViewModel(
     providedAppModule: AppModule? = null,
-    private val gameStateRepository: GameStateRepository? = null,
+    gameStateRepository: GameStateRepository? = null,
     private val chessRulesEngine: ChessRulesEngine = ChessRulesEngine(),
     private val openingDetector: OpeningDetector = OpeningDetector(),
     private val importExportGameUseCase: ImportExportGameUseCase = ImportExportGameUseCase()
@@ -73,6 +62,7 @@ class ChessBoardViewModel(
     private val animationController = AnimationController(animationManager)
     private val settingsManager = SettingsManager()
     private val moveController = MoveController(chessRulesEngine, gameStateManager, animationController)
+    private val persistence = gameStateRepository?.let { GamePersistence(it, settingsManager, moveController) }
 
     private val _isInitializing = MutableStateFlow(true)
     private val _currentOpening = MutableStateFlow<OpeningInfo?>(null)
@@ -91,76 +81,13 @@ class ChessBoardViewModel(
     val errorState: StateFlow<ChessError?> = errorManager.currentError
     val currentTimeControl: StateFlow<TimeControl> = settingsManager.currentTimeControl
     val playerTimeRemaining: StateFlow<Map<ChessColor, Long>> = settingsManager.playerTimeRemaining
-    val glitchedSquares: StateFlow<Set<Square>> = MutableStateFlow<Set<Square>>(emptySet()).asStateFlow()
 
-    val uiState: StateFlow<ChessBoardUiState> = combine(
-        combine(
-            gameStateManager.board,
-            gameStateManager.boardState,
-            gameStateManager.currentTurn,
-            gameStateManager.moveHistory
-        ) { board, boardState, turn, history ->
-            GameData(board, boardState, turn, history)
-        },
-        combine(
-            gameStateManager.capturedPieces,
-            gameStateManager.gameStatus,
-            gameStateManager.lastMove
-        ) { captured, status, lastMove ->
-            StatusData(captured, status, lastMove)
-        },
-        combine(
-            moveController.selectedSquare,
-            moveController.possibleMoves,
-            animationController.animations,
-            animationController.isAnimatingState
-        ) { selected, possible, anims, animating ->
-            InteractionData(selected, possible, anims, animating)
-        },
-        combine(
-            settingsManager.isFlipped,
-            settingsManager.showCoordinates,
-            settingsManager.showNewGameDialog,
-            settingsManager.playMode
-        ) { flipped, coords, dialog, mode ->
-            PrefsData(flipped, coords, dialog, mode)
-        },
-        combine(
-            settingsManager.playerColor,
-            settingsManager.engineSettings,
-            animationController.animatingPieces
-        ) { color, engine, animPieces ->
-            SettingsData(color, engine, animPieces)
-        }
-    ) { game, status, interaction, prefs, settings ->
-        ChessBoardUiState(
-            board = game.board,
-            boardState = game.boardState,
-            currentTurn = game.turn,
-            moveHistory = game.history,
-            capturedPieces = status.captured,
-            isCheck = status.status.isCheck,
-            isCheckmate = status.status.isCheckmate,
-            isStalemate = status.status.isStalemate,
-            isDraw = status.status.isDraw,
-            selectedSquare = interaction.selected,
-            possibleMoves = interaction.possible,
-            lastMove = status.lastMove,
-            isFlipped = prefs.flipped,
-            showCoordinates = prefs.coords,
-            showNewGameDialog = prefs.dialog,
-            playMode = prefs.mode,
-            playerColor = settings.color,
-            engineSettings = settings.engine,
-            animations = interaction.anims,
-            isAnimating = interaction.animating,
-            animatingPieces = settings.animPieces
+    val uiState: StateFlow<ChessBoardUiState> =
+        chessBoardUiState(gameStateManager, moveController, animationController, settingsManager).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(ChessConstants.FLOW_SUBSCRIPTION_TIMEOUT_MS),
+            initialValue = ChessBoardUiState()
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(ChessConstants.FLOW_SUBSCRIPTION_TIMEOUT_MS),
-        initialValue = ChessBoardUiState()
-    )
 
     init {
         gameStateManager.initialize()
@@ -223,7 +150,7 @@ class ChessBoardViewModel(
 
     private fun clearAndStartNewGame() {
         viewModelScope.launch {
-            gameStateRepository?.clearGameState()
+            persistence?.clear()
             resetToNewGame()
         }
     }
@@ -453,91 +380,42 @@ class ChessBoardViewModel(
     fun setTimeControl(timeControl: TimeControl) = settingsManager.setTimeControl(timeControl)
 
     fun saveGameState() {
-        gameStateRepository?.let { repo ->
-            viewModelScope.launch {
-                try {
-                    val gameState = gameStateManager.currentGameState ?: return@launch
-                    val savedState = SavedGameState(
-                        fen = gameState.toFen(),
-                        moveHistory = gameState.moveHistory,
-                        capturedPieces = gameState.capturedPieces,
-                        playMode = settingsManager.playMode.value.name,
-                        playerColor = settingsManager.playerColor.value.name,
-                        engineSettings = settingsManager.engineSettings.value,
-                        isFlipped = settingsManager.isFlipped.value,
-                        showCoordinates = settingsManager.showCoordinates.value,
-                        positionEvaluations = emptyList(),
-                        startFen = gameState.startingFen()
-                    )
-                    repo.saveGameState(savedState)
-                } catch (e: Exception) {
-                    errorManager.reportError(ChessError.SaveGameError(
-                        message = "Could not save game: ${e.message}"
-                    ))
-                }
+        val persistence = persistence ?: return
+        viewModelScope.launch {
+            try {
+                val gameState = gameStateManager.currentGameState ?: return@launch
+                persistence.save(gameState)
+            } catch (e: Exception) {
+                errorManager.reportError(ChessError.SaveGameError(
+                    message = "Could not save game: ${e.message}"
+                ))
             }
         }
     }
 
     suspend fun loadSavedGame() {
-        gameStateRepository?.let { repo ->
-            try {
-                val savedState = repo.loadGameState() ?: return
-                val restored = moveController.restoreGame(
-                    startFen = savedState.startFen ?: ChessConstants.STARTING_POSITION_FEN,
-                    moves = savedState.moveHistory,
-                    finalFen = savedState.fen
-                )
-                val gameState = if (restored.moveHistory.size == savedState.moveHistory.size) {
-                    restored
-                } else {
-                    restored.copy(capturedPieces = savedState.capturedPieces)
-                }
+        val persistence = persistence ?: return resetToNewGame()
+        try {
+            val gameState = persistence.load() ?: return
 
-                cancelPendingWork()
-                gameStateManager.updateFromGameState(gameState)
-                gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
-                refreshOpening(gameState.moveHistory)
+            cancelPendingWork()
+            gameStateManager.updateFromGameState(gameState)
+            gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
+            refreshOpening(gameState.moveHistory)
+            moveController.clearSelection()
 
-                settingsManager.setFlipped(savedState.isFlipped)
-                settingsManager.setShowCoordinates(savedState.showCoordinates)
-                settingsManager.setPlayMode(PlayMode.valueOf(savedState.playMode))
-                settingsManager.setPlayerColor(PlayerColor.valueOf(savedState.playerColor))
-                setEngineSettings(savedState.engineSettings)
-
-                moveController.clearSelection()
-                animationController.clearAnimations()
-
-                viewModelScope.launch { ensureEngineReadyAndMaybeMove() }
-            } catch (e: Exception) {
-                errorManager.reportError(ChessError.LoadGameError(
-                    message = "Could not load saved game: ${e.message}"
-                ))
-                resetToNewGame()
-            }
-        } ?: resetToNewGame()
+            viewModelScope.launch { ensureEngineReadyAndMaybeMove() }
+        } catch (e: Exception) {
+            errorManager.reportError(ChessError.LoadGameError(
+                message = "Could not load saved game: ${e.message}"
+            ))
+            resetToNewGame()
+        }
     }
 
     fun exportGame(format: ExportFormat): String {
         val gameState = gameStateManager.currentGameState ?: return ""
-        val additionalData = ExportAdditionalData(
-            event = "ChessPredictor Game",
-            site = "ChessPredictor App",
-            date = Clock.System.now().toString().substring(0, 10).replace("-", "."),
-            white = if (settingsManager.playerColor.value == PlayerColor.WHITE) "Player" else "Engine",
-            black = if (settingsManager.playerColor.value == PlayerColor.BLACK) "Player" else "Engine",
-            whiteAccuracy = null,
-            blackAccuracy = null,
-            evaluations = emptyList(),
-            keyMoments = null,
-            openingName = _currentOpening.value?.opening?.name,
-            openingEco = _currentOpening.value?.opening?.eco,
-            timeControl = settingsManager.currentTimeControl.value.let { "${it.initialTime / 60000}+${it.increment / 1000}" },
-            playMode = settingsManager.playMode.value.name,
-            playerColor = settingsManager.playerColor.value.name,
-            engineDifficulty = settingsManager.engineSettings.value.difficulty.name
-        )
-        return importExportGameUseCase.exportGame(gameState, format, additionalData)
+        return importExportGameUseCase.exportGame(gameState, format, settingsManager.exportMetadata(_currentOpening.value))
     }
 
     fun importGame(content: String, format: ExportFormat) {
@@ -548,15 +426,7 @@ class ChessBoardViewModel(
                     gameStateManager.updateFromGameState(importedData.gameState)
                     gameStateManager.setLastMove(importedData.gameState.moveHistory.lastOrNull()?.move)
                     moveController.clearSelection()
-                    animationController.clearAnimations()
-
-                    importedData.additionalData?.let { data ->
-                        PlayMode.entries.find { it.name == data.playMode }?.let(settingsManager::setPlayMode)
-                        PlayerColor.entries.find { it.name == data.playerColor }?.let(settingsManager::setPlayerColor)
-                        EngineDifficulty.entries.find { it.name == data.engineDifficulty }?.let { difficulty ->
-                            setEngineSettings(settingsManager.engineSettings.value.copy(difficulty = difficulty))
-                        }
-                    }
+                    importedData.additionalData?.let(settingsManager::applyImportedSettings)
 
                     refreshOpening(importedData.gameState.moveHistory)
                     saveGameState()
@@ -574,64 +444,3 @@ class ChessBoardViewModel(
 }
 
 expect fun getOrCreateAppModule(): AppModule
-
-private data class GameData(
-    val board: ChessBoard,
-    val boardState: Map<Square, ChessPiece>,
-    val turn: ChessColor,
-    val history: List<DetailedMove>
-)
-
-private data class StatusData(
-    val captured: List<ChessPiece>,
-    val status: GameStatus,
-    val lastMove: ChessMove?
-)
-
-private data class InteractionData(
-    val selected: Square?,
-    val possible: List<Square>,
-    val anims: List<PieceAnimation>,
-    val animating: Boolean
-)
-
-private data class PrefsData(
-    val flipped: Boolean,
-    val coords: Boolean,
-    val dialog: Boolean,
-    val mode: PlayMode
-)
-
-private data class SettingsData(
-    val color: PlayerColor,
-    val engine: EngineSettings,
-    val animPieces: Set<Square>
-)
-
-data class ChessBoardUiState(
-    val board: ChessBoard = ChessBoard(
-        fen = ChessConstants.STARTING_POSITION_FEN,
-        turn = ChessColor.WHITE,
-        castlingRights = CastlingRights(true, true, true, true)
-    ),
-    val boardState: Map<Square, ChessPiece> = emptyMap(),
-    val currentTurn: ChessColor = ChessColor.WHITE,
-    val selectedSquare: Square? = null,
-    val possibleMoves: List<Square> = emptyList(),
-    val lastMove: ChessMove? = null,
-    val playMode: PlayMode = PlayMode.VS_ENGINE,
-    val playerColor: PlayerColor = PlayerColor.WHITE,
-    val engineSettings: EngineSettings = EngineSettings(),
-    val isCheck: Boolean = false,
-    val isCheckmate: Boolean = false,
-    val isStalemate: Boolean = false,
-    val isDraw: Boolean = false,
-    val moveHistory: List<DetailedMove> = emptyList(),
-    val capturedPieces: List<ChessPiece> = emptyList(),
-    val isFlipped: Boolean = false,
-    val showCoordinates: Boolean = true,
-    val showNewGameDialog: Boolean = false,
-    val animations: List<PieceAnimation> = emptyList(),
-    val isAnimating: Boolean = false,
-    val animatingPieces: Set<Square> = emptySet()
-)
