@@ -78,6 +78,7 @@ class ChessBoardViewModel(
     private val _currentOpening = MutableStateFlow<OpeningInfo?>(null)
     private var moveStartTime = 0L
     private var pendingMoveJob: Job? = null
+    private var openingJob: Job? = null
 
     val currentOpening: StateFlow<OpeningInfo?> = _currentOpening.asStateFlow()
     val isThinking: StateFlow<Boolean> = engineManager.isThinking
@@ -207,10 +208,17 @@ class ChessBoardViewModel(
         }
     }
 
-    private fun detectOpeningSafe(history: List<DetailedMove>): OpeningInfo? {
-        return try {
-            if (history.isNotEmpty()) openingDetector.detectOpening(history) else null
-        } catch (e: Exception) { null }
+    private fun refreshOpening(history: List<DetailedMove>) {
+        openingJob?.cancel()
+        if (history.isEmpty()) {
+            _currentOpening.value = null
+            return
+        }
+        openingJob = viewModelScope.launch {
+            _currentOpening.value = withContext(Dispatchers.Default) {
+                runCatching { openingDetector.detectOpening(history) }.getOrNull()
+            }
+        }
     }
 
     private fun clearAndStartNewGame() {
@@ -244,7 +252,7 @@ class ChessBoardViewModel(
         moveController.clearSelection()
         settingsManager.resetPlayerTimes()
         moveStartTime = 0L
-        _currentOpening.value = null
+        refreshOpening(emptyList())
 
         viewModelScope.launch { ensureEngineReadyAndMaybeMove() }
     }
@@ -326,7 +334,7 @@ class ChessBoardViewModel(
         gameStateManager.setLastMove(result.move)
         animationController.clearAnimations()
 
-        _currentOpening.value = detectOpeningSafe(finalState.moveHistory)
+        refreshOpening(finalState.moveHistory)
 
         saveGameState()
 
@@ -386,7 +394,7 @@ class ChessBoardViewModel(
         while (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
             if (!moveController.undoLastMove()) break
         }
-        _currentOpening.value = detectOpeningSafe(gameStateManager.moveHistory.value)
+        refreshOpening(gameStateManager.moveHistory.value)
         saveGameState()
         if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
             getEngineMove()
@@ -489,7 +497,7 @@ class ChessBoardViewModel(
                 cancelPendingWork()
                 gameStateManager.updateFromGameState(gameState)
                 gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
-                _currentOpening.value = detectOpeningSafe(gameState.moveHistory)
+                refreshOpening(gameState.moveHistory)
 
                 settingsManager.setFlipped(savedState.isFlipped)
                 settingsManager.setShowCoordinates(savedState.showCoordinates)
@@ -550,7 +558,7 @@ class ChessBoardViewModel(
                         }
                     }
 
-                    _currentOpening.value = detectOpeningSafe(importedData.gameState.moveHistory)
+                    refreshOpening(importedData.gameState.moveHistory)
                     saveGameState()
                     if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
                         getEngineMove()

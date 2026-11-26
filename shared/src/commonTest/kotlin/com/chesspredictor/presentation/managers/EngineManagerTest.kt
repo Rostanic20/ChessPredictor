@@ -78,6 +78,51 @@ class EngineManagerTest {
         assertNull(manager.error.value)
     }
 
+    private class SlowAnalysisRepository : ChessEngineRepository {
+        val pendingAnalyses = mutableListOf<CompletableDeferred<PositionAnalysis>>()
+
+        override suspend fun analyzeBestMove(board: ChessBoard, settings: EngineSettings): ChessMove? =
+            ChessMove(Square('e', 7), Square('e', 5), ChessPiece.Pawn(ChessColor.BLACK))
+
+        override suspend fun analyzePosition(board: ChessBoard, settings: EngineSettings): PositionAnalysis {
+            val reply = CompletableDeferred<PositionAnalysis>()
+            pendingAnalyses += reply
+            return reply.await()
+        }
+
+        override suspend fun analyzeWithEvaluation(board: ChessBoard, settings: EngineSettings): EngineAnalysis? = null
+        override suspend fun validateMove(board: ChessBoard, move: ChessMove) = true
+        override suspend fun getAvailableMoves(board: ChessBoard) = emptyList<ChessMove>()
+        override fun observeEvaluation(): Flow<Float> = emptyFlow()
+    }
+
+    @Test
+    fun moveIsDeliveredBeforeTheFollowUpAnalysisFinishes() = runTest {
+        val repository = SlowAnalysisRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(repository, scope, HumanBehaviorManager(scope)).also { it.setReady(true) }
+        val humanSettings = EngineSettings(humanStyle = true, timeLimit = 100)
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, humanSettings) { delivered += it }
+        runCurrent()
+
+        assertEquals(listOf(e5), delivered)
+        assertEquals(1, repository.pendingAnalyses.size)
+        assertFalse(manager.isThinking.value)
+
+        manager.requestEngineMove(board, humanSettings) { delivered += it }
+        runCurrent()
+
+        assertEquals(2, repository.pendingAnalyses.size)
+        repository.pendingAnalyses.first().complete(PositionAnalysis(bestMove = null, evaluation = 0f))
+        runCurrent()
+
+        assertEquals(listOf(e5, e5), delivered)
+        assertFalse(manager.isThinking.value)
+        assertNull(manager.error.value)
+    }
+
     @Test
     fun newRequestSupersedesThePreviousOne() = runTest {
         val repository = PendingRepository()

@@ -145,35 +145,14 @@ class EngineManager(
                         move
                     }
 
-                    if (settings.humanStyle && humanBehaviorManager != null) {
-                        try {
-                            val positionAnalysis = repository.analyzePosition(board, settings)
-
-                            humanBehaviorManager.updateEmotionalState(
-                                settings.behaviorProfile,
-                                board,
-                                finalMove,
-                                positionAnalysis.evaluation
-                            )
-
-                            humanBehaviorManager.generateMoveCommentary(
-                                settings.behaviorProfile,
-                                board,
-                                finalMove,
-                                positionAnalysis.evaluation
-                            )
-                        } catch (e: Exception) {
-                            ChessLogger.warning(TAG, "Failed to update human behavior state: ${e.message}")
-                        }
-                    }
-
-                    if (settings.humanStyle) {
-                        evaluateDrawOffer(board, settings)
-                    }
-                    
                     ChessLogger.info(TAG, "Engine move successful: ${finalMove.from} -> ${finalMove.to}")
                     ensureActive()
+                    _isThinking.value = false
                     onMoveReady(finalMove)
+
+                    if (settings.humanStyle) {
+                        reactToOwnMove(board, finalMove, settings)
+                    }
                 } else {
                     ChessLogger.warning(TAG, "Engine returned no move")
                 }
@@ -195,6 +174,21 @@ class EngineManager(
     
     fun clearError() {
         _error.value = null
+    }
+
+    private suspend fun reactToOwnMove(board: ChessBoard, move: ChessMove, settings: EngineSettings) {
+        if (humanBehaviorManager != null) {
+            try {
+                val positionAnalysis = repository.analyzePosition(board, settings)
+                humanBehaviorManager.updateEmotionalState(settings.behaviorProfile, board, move, positionAnalysis.evaluation)
+                humanBehaviorManager.generateMoveCommentary(settings.behaviorProfile, board, move, positionAnalysis.evaluation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ChessLogger.warning(TAG, "Failed to update human behavior state: ${e.message}")
+            }
+        }
+        evaluateDrawOffer(board, settings)
     }
 
     private suspend fun applyHumanMistakes(bestMove: ChessMove, board: ChessBoard, settings: EngineSettings): ChessMove {
@@ -241,6 +235,8 @@ class EngineManager(
         
         return try {
             repository.analyzeBestMove(board, blunderSettings)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             ChessLogger.warning(TAG, "Failed to get blunder move: ${e.message}")
             null
@@ -256,6 +252,8 @@ class EngineManager(
         
         return try {
             repository.analyzeBestMove(board, inaccurateSettings)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             ChessLogger.warning(TAG, "Failed to get inaccurate move: ${e.message}")
             null
@@ -315,7 +313,8 @@ class EngineManager(
             }
             
             lastEvaluation = currentEval
-            
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             ChessLogger.warning(TAG, "Failed to evaluate draw offer: ${e.message}")
         }
