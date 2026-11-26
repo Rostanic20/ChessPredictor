@@ -85,19 +85,6 @@ private fun LandscapeLayout(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (uiState.isGameOver) {
-                    GameStatusCard(
-                        uiState = uiState,
-                        isThinking = isThinking,
-                        isEngineReady = isEngineReady,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                    )
-                }
-
-                ClocksIfEnabled(uiState, remainingTimes, Modifier.padding(bottom = 8.dp))
-
                 ModernChessBoard(
                     uiState = uiState,
                     onSquareClick = actions.onSquareClick,
@@ -116,13 +103,13 @@ private fun LandscapeLayout(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (!uiState.isGameOver) {
-                GameStatusCard(
-                    uiState = uiState,
-                    isThinking = isThinking,
-                    isEngineReady = isEngineReady
-                )
-            }
+            GameStatusCard(
+                uiState = uiState,
+                isThinking = isThinking,
+                isEngineReady = isEngineReady
+            )
+
+            ClocksIfEnabled(uiState, remainingTimes)
 
             if (uiState.moveHistory.isNotEmpty()) {
                 MoveHistoryDisplay(
