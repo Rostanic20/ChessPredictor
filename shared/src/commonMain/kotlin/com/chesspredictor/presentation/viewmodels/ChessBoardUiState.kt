@@ -53,6 +53,7 @@ data class ChessBoardUiState(
     val timeControl: TimeControl? = null
 ) {
     val isGameOver: Boolean get() = isCheckmate || isStalemate || isDraw || ending != null
+    val isInProgress: Boolean get() = moveHistory.isNotEmpty() && !isGameOver
 }
 
 internal fun chessBoardUiState(

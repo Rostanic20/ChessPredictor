@@ -8,20 +8,22 @@ import com.chesspredictor.domain.repositories.ChessEngineRepository
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class AppModule {
-    private val stockfishDataSource by lazy { createStockfishDataSource() }
+class AppModule(
+    createEngine: () -> ChessEngineDataSource = { createStockfishDataSource() as ChessEngineDataSource }
+) {
+    private val engineDataSource by lazy(createEngine)
     private val moveParser by lazy { MoveParserImpl() }
     private val engineInitMutex = Mutex()
     private var engineInitialized = false
 
     val chessEngineRepository: ChessEngineRepository by lazy {
-        ChessEngineRepositoryImpl(stockfishDataSource as ChessEngineDataSource, moveParser)
+        ChessEngineRepositoryImpl(engineDataSource, moveParser)
     }
 
     suspend fun initializeEngine() {
         engineInitMutex.withLock {
             if (engineInitialized) return
-            (stockfishDataSource as ChessEngineDataSource).initialize()
+            engineDataSource.initialize()
             engineInitialized = true
         }
     }

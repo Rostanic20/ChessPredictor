@@ -61,6 +61,7 @@ internal fun GameSettingsPanel(
 
         TimeControlSelector(
             current = uiState.timeControl,
+            locked = uiState.isInProgress,
             onSelect = onTimeControlChange
         )
 
@@ -74,6 +75,7 @@ internal fun GameSettingsPanel(
 @Composable
 private fun TimeControlSelector(
     current: TimeControl?,
+    locked: Boolean,
     onSelect: (TimeControl?) -> Unit
 ) {
     Card(
@@ -108,11 +110,20 @@ private fun TimeControlSelector(
                                 selected = current == option,
                                 onClick = { onSelect(option) },
                                 label = { Text(option?.label ?: "No clock") },
+                                enabled = !locked,
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
+            }
+            if (locked) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "The clock can be changed before the first move or after the game ends.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

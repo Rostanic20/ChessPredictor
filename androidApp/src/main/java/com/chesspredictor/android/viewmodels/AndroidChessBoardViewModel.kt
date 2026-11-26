@@ -21,6 +21,6 @@ class AndroidChessBoardViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        chessBoardViewModel.saveGameState()
+        chessBoardViewModel.close()
     }
 }

@@ -32,10 +32,12 @@ import com.chesspredictor.presentation.managers.PlayerColor
 import com.chesspredictor.presentation.managers.SettingsManager
 import com.chesspredictor.presentation.ErrorStateManager
 import com.chesspredictor.presentation.ChessError
+import com.chesspredictor.utils.ChessLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -405,9 +407,33 @@ class ChessBoardViewModel(
     }
 
     fun setTimeControl(timeControl: TimeControl?) {
+        if (gameStateManager.moveHistory.value.isNotEmpty() && !gameStateManager.isGameOver()) return
         clock.setTimeControl(timeControl)
         restartClock()
         saveGameState()
+    }
+
+    fun close() {
+        engineManager.cancelPendingMove()
+        pendingMoveJob?.cancel()
+        openingJob?.cancel()
+        clock.pause()
+        val persistence = persistence
+        val gameState = gameStateManager.currentGameState
+        if (persistence == null || gameState == null) {
+            viewModelScope.cancel()
+            return
+        }
+        val ending = gameStateManager.gameStatus.value.ending
+        viewModelScope.launch {
+            try {
+                persistence.save(gameState, ending)
+            } catch (e: Exception) {
+                ChessLogger.error("ChessBoardViewModel", "Final save failed", e)
+            } finally {
+                viewModelScope.cancel()
+            }
+        }
     }
 
     fun pauseClock() = clock.pause()
