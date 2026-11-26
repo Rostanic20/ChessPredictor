@@ -1,10 +1,8 @@
 package com.chesspredictor.domain.usecases
 
-import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessOpening
 import com.chesspredictor.domain.entities.ChessPiece
-import com.chesspredictor.domain.entities.Square
 
 data class WeightedMove(
     val move: String,
@@ -63,7 +61,7 @@ class SimpleOpeningBook {
 
         for (san in sanMoves) {
             val legalMoves = engine.getLegalMoves(state)
-            val matched = matchSanToMove(san, legalMoves, state.turn) ?: break
+            val matched = SanMoveMatcher.match(san, legalMoves, state.turn) ?: break
 
             val positionKey = state.toPositionKey()
             val uci = toUci(matched)
@@ -78,78 +76,6 @@ class SimpleOpeningBook {
         val mainLineBonus = if (opening.isMainLine) 1.2f else 1.0f
         val gamesBonus = (opening.statistics.totalGames / 50000f).coerceIn(0.5f, 2.0f)
         return popularityWeight * mainLineBonus * gamesBonus
-    }
-
-    private fun matchSanToMove(san: String, legalMoves: List<ChessMove>, turn: ChessColor): ChessMove? {
-        val cleaned = san.replace("+", "").replace("#", "").replace("!", "").replace("?", "")
-
-        if (cleaned == "O-O" || cleaned == "0-0") {
-            val rank = if (turn == ChessColor.WHITE) 1 else 8
-            return legalMoves.find { it.from == Square('e', rank) && it.to == Square('g', rank) }
-        }
-        if (cleaned == "O-O-O" || cleaned == "0-0-0") {
-            val rank = if (turn == ChessColor.WHITE) 1 else 8
-            return legalMoves.find { it.from == Square('e', rank) && it.to == Square('c', rank) }
-        }
-
-        var work = cleaned
-        var promotionChar: Char? = null
-        if (work.contains("=")) {
-            val eqIndex = work.indexOf("=")
-            promotionChar = work[eqIndex + 1]
-            work = work.substring(0, eqIndex)
-        }
-
-        work = work.replace("x", "")
-
-        val targetFile = work[work.length - 2]
-        val targetRank = work[work.length - 1].digitToInt()
-        val target = Square(targetFile, targetRank)
-
-        val prefix = work.substring(0, work.length - 2)
-
-        val isPawn = prefix.isEmpty() || (prefix.length == 1 && prefix[0].isLowerCase())
-
-        val candidates = if (isPawn) {
-            var pawns = legalMoves.filter { it.piece is ChessPiece.Pawn && it.to == target }
-            if (prefix.isNotEmpty()) {
-                val fileDisambig = prefix[0]
-                pawns = pawns.filter { it.from.file == fileDisambig }
-            }
-            if (promotionChar != null) {
-                pawns = pawns.filter { it.promotion != null && pieceMatchesChar(it.promotion, promotionChar) }
-            } else {
-                pawns = pawns.filter { it.promotion == null }
-            }
-            pawns
-        } else {
-            val pieceChar = prefix[0]
-            val disambig = prefix.substring(1)
-            var pieces = legalMoves.filter { it.to == target && pieceMatchesChar(it.piece, pieceChar) }
-            if (disambig.isNotEmpty()) {
-                for (c in disambig) {
-                    pieces = if (c.isLetter()) {
-                        pieces.filter { it.from.file == c }
-                    } else {
-                        pieces.filter { it.from.rank == c.digitToInt() }
-                    }
-                }
-            }
-            pieces
-        }
-
-        return candidates.firstOrNull()
-    }
-
-    private fun pieceMatchesChar(piece: ChessPiece, char: Char): Boolean {
-        return when (char) {
-            'K' -> piece is ChessPiece.King
-            'Q' -> piece is ChessPiece.Queen
-            'R' -> piece is ChessPiece.Rook
-            'B' -> piece is ChessPiece.Bishop
-            'N' -> piece is ChessPiece.Knight
-            else -> false
-        }
     }
 
     private fun toUci(move: ChessMove): String {

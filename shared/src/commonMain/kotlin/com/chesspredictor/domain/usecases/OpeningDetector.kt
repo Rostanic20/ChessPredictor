@@ -1,29 +1,36 @@
 package com.chesspredictor.domain.usecases
 
-import com.chesspredictor.domain.entities.CastlingRights
-import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessOpening
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
+import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.OpeningCategory
 import com.chesspredictor.domain.entities.OpeningDifficulty
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.OpeningStatistics
 import com.chesspredictor.domain.entities.OpeningTheme
 import com.chesspredictor.domain.entities.PopularMove
-import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.utils.ChessConstants
 
 class OpeningDetector {
 
     companion object {
-        private const val MAX_CACHE_SIZE = 256
+        private const val MAX_OPENING_PLIES = 30
+        private const val MIN_FAMILY_PLIES = 2
     }
 
     private val openingDatabase = AdvancedOpeningDatabase.openingDatabase
+    private val rulesEngine = ChessRulesEngine()
 
-    private val transpositionCache = linkedMapOf<String, ChessOpening>()
-    
+    private val linePositions: List<Pair<ChessOpening, String>> by lazy {
+        openingDatabase.flatMap { opening ->
+            (listOf(opening.moves) + opening.transpositions).mapNotNull { line ->
+                finalPositionKey(line)?.let { opening to it }
+            }
+        }
+    }
+
     private val ecoHierarchy = mapOf(
         "C60" to listOf("C65", "C68", "C77", "C89", "C95"),
         "C50" to listOf("C51", "C53", "C55"),
@@ -35,109 +42,75 @@ class OpeningDetector {
     )
     
     fun detectOpening(moveHistory: List<DetailedMove>): OpeningInfo {
-        if (moveHistory.isEmpty()) {
-            return OpeningInfo(null)
-        }
-        
+        if (moveHistory.isEmpty()) return OpeningInfo(null)
+
         val sanMoves = moveHistory.map { detailedMove ->
-            detailedMove.san.ifEmpty {
-                convertMoveToSimpleNotation(detailedMove.move)
-            }
+            detailedMove.san.ifEmpty { convertMoveToSimpleNotation(detailedMove.move) }
         }
-        
-        val positionKey = sanMoves.joinToString(",")
-        transpositionCache[positionKey]?.let { cachedOpening ->
-            return createOpeningInfo(cachedOpening, sanMoves, true)
-        }
+        val gamePositions = gamePositionKeys(moveHistory.take(MAX_OPENING_PLIES)) ?: return OpeningInfo(null)
 
-        val primaryResult = detectPrimaryOpening(sanMoves)
-        if (primaryResult.opening != null) {
-            putCache(positionKey, primaryResult.opening)
-            return primaryResult
+        reachedOpening(gamePositions)?.let { opening ->
+            val playedInBookOrder = getMatchingMoveCount(sanMoves, opening.moves) == opening.moves.size
+            return createOpeningInfo(opening, sanMoves, !playedInBookOrder, opening.moves.size)
         }
-
-        val transpositionResult = detectTranspositions(sanMoves)
-        if (transpositionResult.opening != null) {
-            putCache(positionKey, transpositionResult.opening)
-            return transpositionResult
-        }
-        
-        return detectPartialMatch(sanMoves)
-    }
-    
-    private fun putCache(key: String, opening: ChessOpening) {
-        if (transpositionCache.size >= MAX_CACHE_SIZE) {
-            val eldest = transpositionCache.keys.first()
-            transpositionCache.remove(eldest)
-        }
-        transpositionCache[key] = opening
+        return familyOpening(sanMoves)
     }
 
-    private fun detectPrimaryOpening(sanMoves: List<String>): OpeningInfo {
-        if (openingDatabase.isEmpty()) return OpeningInfo(null)
+    private fun positionKey(state: GameState): String = state.toFen().split(" ").take(3).joinToString(" ")
 
-        val sortedOpenings = openingDatabase.sortedWith(
-            compareByDescending<ChessOpening> { it.moves.size }
-                .thenByDescending { it.popularity }
-                .thenBy { if (it.isMainLine) 0 else 1 }
+    private fun finalPositionKey(sans: List<String>): String? {
+        var state = rulesEngine.parseGameState(ChessConstants.STARTING_FEN)
+        for (san in sans) {
+            val move = SanMoveMatcher.match(san, rulesEngine.getLegalMoves(state), state.turn) ?: return null
+            state = rulesEngine.makeMove(state, move) ?: return null
+        }
+        return positionKey(state)
+    }
+
+    private fun gamePositionKeys(moves: List<DetailedMove>): List<String>? {
+        var state = rulesEngine.parseGameState(ChessConstants.STARTING_FEN)
+        return moves.map { detailed ->
+            val piece = state.board[detailed.move.from] ?: return null
+            state = rulesEngine.makeMove(state, detailed.move.copy(piece = piece)) ?: return null
+            positionKey(state)
+        }
+    }
+
+    private fun reachedOpening(gamePositions: List<String>): ChessOpening? {
+        val lastPlyOf = gamePositions.withIndex().associate { (ply, key) -> key to ply }
+        return linePositions
+            .mapNotNull { (opening, key) -> lastPlyOf[key]?.let { ply -> opening to ply } }
+            .maxWithOrNull(
+                compareBy<Pair<ChessOpening, Int>> { it.second }
+                    .thenBy { it.first.moves.size }
+                    .thenBy { it.first.popularity }
+            )
+            ?.first
+    }
+
+    private fun familyOpening(sanMoves: List<String>): OpeningInfo {
+        val matches = openingDatabase.map { it to getMatchingMoveCount(sanMoves, it.moves) }
+        val longest = matches.maxOfOrNull { it.second } ?: 0
+        if (longest < MIN_FAMILY_PLIES) return OpeningInfo(null)
+
+        val candidates = matches.filter { it.second == longest }.map { it.first }
+        val family = candidates.map { it.name.substringBefore(':').trim() }.distinct().singleOrNull()
+            ?: return OpeningInfo(null)
+        val ecos = candidates.map { it.eco }.toSet()
+        val familyEco = ecoHierarchy.entries.find { (_, children) -> children.containsAll(ecos) }?.key ?: ""
+
+        return OpeningInfo(
+            opening = ChessOpening(name = family, eco = familyEco, moves = candidates.first().moves.take(longest)),
+            moveNumber = longest,
+            nextPopularMoves = findContinuations(sanMoves).take(3)
         )
+    }
 
-        for (opening in sortedOpenings) {
-            val matchLength = getMatchingMoveCount(sanMoves, opening.moves)
-            if (matchLength == opening.moves.size && matchLength >= 2) {
-                return createOpeningInfo(opening, sanMoves, false, matchLength)
-            }
-        }
-        
-        return OpeningInfo(null)
-    }
-    
-    private fun detectTranspositions(sanMoves: List<String>): OpeningInfo {
-        for (opening in openingDatabase) {
-            for (transposition in opening.transpositions) {
-                if (isTransposition(sanMoves, transposition)) {
-                    return createOpeningInfo(opening, sanMoves, true)
-                }
-            }
-            
-            if (couldTransposeTo(sanMoves, opening.moves)) {
-                return createOpeningInfo(opening, sanMoves, true)
-            }
-        }
-        
-        return OpeningInfo(null)
-    }
-    
-    private fun detectPartialMatch(sanMoves: List<String>): OpeningInfo {
-        var bestMatch: ChessOpening? = null
-        var longestMatch = 0
-        
-        val sortedOpenings = openingDatabase.sortedWith(
-            compareByDescending<ChessOpening> { it.popularity }
-                .thenBy { if (it.isMainLine) 0 else 1 }
-                .thenByDescending { it.moves.size }
-        )
-        
-        for (opening in sortedOpenings) {
-            val matchLength = getMatchingMoveCount(sanMoves, opening.moves)
-            if (matchLength > longestMatch && matchLength >= 2) {
-                longestMatch = matchLength
-                bestMatch = opening
-            }
-        }
-        
-        return if (bestMatch != null) {
-            createOpeningInfo(bestMatch, sanMoves, false, longestMatch)
-        } else {
-            OpeningInfo(null)
-        }
-    }
-    
     private fun createOpeningInfo(
-        opening: ChessOpening, 
-        sanMoves: List<String>, 
+        opening: ChessOpening,
+        sanMoves: List<String>,
         isTransposition: Boolean,
-        moveNumber: Int = sanMoves.size
+        moveNumber: Int
     ): OpeningInfo {
         return OpeningInfo(
             opening = opening,
@@ -147,24 +120,6 @@ class OpeningDetector {
             positionEvaluation = calculatePositionEvaluation(opening, sanMoves.size),
             variation = determineVariation(opening, moveNumber)
         )
-    }
-    
-    private fun isTransposition(gameMoves: List<String>, transpositionMoves: List<String>): Boolean {
-        if (gameMoves.size < transpositionMoves.size) return false
-        
-        val gameMovesSet = gameMoves.toSet()
-        val transpositionSet = transpositionMoves.toSet()
-        
-        return transpositionSet.all { it in gameMovesSet }
-    }
-    
-    private fun couldTransposeTo(gameMoves: List<String>, targetMoves: List<String>): Boolean {
-        if (gameMoves.size < 3) return false
-
-        val keyMoves = targetMoves.take(4)
-        val gameMovesSet = gameMoves.toSet()
-        
-        return keyMoves.count { it in gameMovesSet } >= keyMoves.size - 1
     }
     
     private fun getNextPopularMoves(opening: ChessOpening, currentMoves: List<String>): List<PopularMove> {
@@ -327,75 +282,4 @@ class OpeningDetector {
         
         return openingDatabase.find { it.eco == parentEco }
     }
-    
-    fun analyzeOpeningRepertoire(playerMoves: List<List<String>>): OpeningRepertoireAnalysis {
-        val openingCounts = mutableMapOf<String, Int>()
-        val categoryDistribution = mutableMapOf<OpeningCategory, Int>()
-        val difficultyDistribution = mutableMapOf<OpeningDifficulty, Int>()
-        
-        for (gameMoves in playerMoves) {
-            val openingInfo = detectOpening(gameMoves.mapIndexed { index, san -> 
-                DetailedMove(
-                    move = ChessMove(Square('a', 1), Square('a', 1), ChessPiece.Pawn(ChessColor.WHITE)),
-                    moveNumber = (index / 2) + 1,
-                    isWhiteMove = index % 2 == 0,
-                    san = san,
-                    previousCastlingRights = CastlingRights(true, true, true, true),
-                    previousEnPassantSquare = null
-                )
-            })
-            
-            openingInfo.opening?.let { opening ->
-                openingCounts[opening.eco] = (openingCounts[opening.eco] ?: 0) + 1
-                categoryDistribution[opening.category] = (categoryDistribution[opening.category] ?: 0) + 1
-                difficultyDistribution[opening.difficulty] = (difficultyDistribution[opening.difficulty] ?: 0) + 1
-            }
-        }
-        
-        return OpeningRepertoireAnalysis(
-            totalGames = playerMoves.size,
-            openingFrequency = openingCounts,
-            categoryDistribution = categoryDistribution,
-            difficultyDistribution = difficultyDistribution,
-            averageDifficulty = calculateAverageDifficulty(difficultyDistribution),
-            diversityScore = calculateDiversityScore(openingCounts, playerMoves.size)
-        )
-    }
-    
-    private fun calculateAverageDifficulty(distribution: Map<OpeningDifficulty, Int>): Float {
-        val total = distribution.values.sum()
-        if (total == 0) return 0f
-        
-        val weightedSum = distribution.entries.sumOf { (difficulty, count) ->
-            val weight = when (difficulty) {
-                OpeningDifficulty.BEGINNER -> 1
-                OpeningDifficulty.INTERMEDIATE -> 2  
-                OpeningDifficulty.ADVANCED -> 3
-                OpeningDifficulty.EXPERT -> 4
-            }
-            weight * count
-        }
-        
-        return weightedSum.toFloat() / total
-    }
-    
-    private fun calculateDiversityScore(openingCounts: Map<String, Int>, totalGames: Int): Float {
-        if (totalGames == 0) return 0f
-        
-        val entropy = openingCounts.values.sumOf { count ->
-            val p = count.toDouble() / totalGames
-            if (p > 0) -p * kotlin.math.ln(p) else 0.0
-        }
-        
-        return (entropy / kotlin.math.ln(openingCounts.size.toDouble())).toFloat()
-    }
 }
-
-data class OpeningRepertoireAnalysis(
-    val totalGames: Int,
-    val openingFrequency: Map<String, Int>,
-    val categoryDistribution: Map<OpeningCategory, Int>,
-    val difficultyDistribution: Map<OpeningDifficulty, Int>,
-    val averageDifficulty: Float,
-    val diversityScore: Float
-)
