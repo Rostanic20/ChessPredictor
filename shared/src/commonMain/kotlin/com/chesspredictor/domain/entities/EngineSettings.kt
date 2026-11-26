@@ -5,17 +5,25 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class EngineSettings(
     val difficulty: EngineDifficulty = EngineDifficulty.CLUB_PLAYER,
-    val analysisDepth: Int = 15,
-    val timeLimit: Int = 1000,
+    val analysisDepth: Int = difficulty.depth,
+    val timeLimit: Int = difficulty.timeMs,
     val threads: Int = 1,
     val hashSize: Int = 16,
-    val skillLevel: Int = 10,
+    val skillLevel: Int = difficulty.skillLevel,
     val useBook: Boolean = true,
     val contempt: Int = 0,
     val multiPV: Int = 1,
     val humanStyle: Boolean = true,
-    val behaviorProfile: HumanBehaviorProfile = HumanBehaviorProfile()
+    val behaviorProfile: HumanBehaviorProfile = difficulty.getDefaultBehaviorProfile()
 ) {
+    fun withDifficulty(newDifficulty: EngineDifficulty): EngineSettings = copy(
+        difficulty = newDifficulty,
+        analysisDepth = newDifficulty.depth,
+        timeLimit = newDifficulty.timeMs,
+        skillLevel = newDifficulty.skillLevel,
+        behaviorProfile = newDifficulty.getDefaultBehaviorProfile()
+    )
+
     val blunderProbability: Float get() = difficulty.blunderRate
     val inaccuracyRate: Float get() = difficulty.inaccuracyRate
     val openingBookUsage: Float get() = difficulty.openingBookUsage

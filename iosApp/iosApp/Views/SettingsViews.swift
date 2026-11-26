@@ -189,9 +189,6 @@ struct DifficultySelector: View {
                     Text(difficultyDescription(difficulty))
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    Text("~\(800 + Int(difficulty.skillLevel) * 100) Elo")
-                        .font(.caption2)
-                        .foregroundColor(.accentColor)
                 }
 
                 Spacer()

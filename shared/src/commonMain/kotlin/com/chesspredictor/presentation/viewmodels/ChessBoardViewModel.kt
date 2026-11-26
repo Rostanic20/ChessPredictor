@@ -431,12 +431,7 @@ class ChessBoardViewModel(
     }
 
     fun setEngineSettings(settings: EngineSettings) {
-        val finalSettings = settings.copy(
-            analysisDepth = settings.difficulty.depth,
-            skillLevel = settings.difficulty.skillLevel,
-            behaviorProfile = settings.difficulty.getDefaultBehaviorProfile()
-        )
-        settingsManager.setEngineSettings(finalSettings)
+        settingsManager.setEngineSettings(settings.withDifficulty(settings.difficulty))
     }
 
     fun setTimeControl(timeControl: TimeControl) = settingsManager.setTimeControl(timeControl)
@@ -485,7 +480,7 @@ class ChessBoardViewModel(
                 settingsManager.setShowCoordinates(savedState.showCoordinates)
                 settingsManager.setPlayMode(PlayMode.valueOf(savedState.playMode))
                 settingsManager.setPlayerColor(PlayerColor.valueOf(savedState.playerColor))
-                settingsManager.setEngineSettings(savedState.engineSettings)
+                setEngineSettings(savedState.engineSettings)
 
                 moveController.clearSelection()
                 animationController.clearAnimations()
@@ -536,9 +531,7 @@ class ChessBoardViewModel(
                         PlayMode.entries.find { it.name == data.playMode }?.let(settingsManager::setPlayMode)
                         PlayerColor.entries.find { it.name == data.playerColor }?.let(settingsManager::setPlayerColor)
                         EngineDifficulty.entries.find { it.name == data.engineDifficulty }?.let { difficulty ->
-                            settingsManager.setEngineSettings(
-                                settingsManager.engineSettings.value.copy(difficulty = difficulty)
-                            )
+                            setEngineSettings(settingsManager.engineSettings.value.copy(difficulty = difficulty))
                         }
                     }
 

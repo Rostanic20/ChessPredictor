@@ -802,11 +802,6 @@ fun DifficultySettings(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    "~${calculateElo(difficulty.skillLevel)} Elo",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
                             }
                         }
                     }
@@ -814,10 +809,6 @@ fun DifficultySettings(
             }
         }
     }
-}
-
-private fun calculateElo(skillLevel: Int): Int {
-    return 800 + (skillLevel * 100)
 }
 
 private fun formatNodes(nodes: Long): String {
