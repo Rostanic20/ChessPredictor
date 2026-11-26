@@ -17,14 +17,14 @@ tasks.named("preBuild") {
 
 android {
     namespace = "com.chesspredictor.android"
-    compileSdk = 34
+    compileSdk = 36
 
     sourceSets["main"].assets.srcDir(engineAssetsDir)
 
     defaultConfig {
         applicationId = "com.chesspredictor.android"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         
