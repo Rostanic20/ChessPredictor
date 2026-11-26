@@ -72,7 +72,7 @@ class ImportExportGameUseCase(
         pgn.appendLine("[Black \"${additionalData?.black ?: "Engine"}\"]")
         pgn.appendLine("[Result \"${getGameResult(gameState)}\"]")
         
-        val startFen = startingFen(gameState)
+        val startFen = gameState.startingFen()
         if (startFen != ChessConstants.STARTING_POSITION_FEN) {
             pgn.appendLine("[FEN \"$startFen\"]")
             pgn.appendLine("[SetUp \"1\"]")
@@ -149,7 +149,7 @@ class ImportExportGameUseCase(
             moves = exportedMoves,
             currentPly = gameState.fullMoveNumber * 2 - (if (gameState.turn == ChessColor.WHITE) 2 else 1),
             timeControl = additionalData?.timeControl,
-            startFen = startingFen(gameState)
+            startFen = gameState.startingFen()
         )
         
         val analysisData = if (additionalData?.whiteAccuracy != null || additionalData?.blackAccuracy != null) {
@@ -240,7 +240,7 @@ class ImportExportGameUseCase(
             replayExportedMoves(data.startFen, data.moves)
                 ?: return Result.failure(IllegalArgumentException("Moves do not replay from the start position"))
         } else {
-            val finalPosition = chessRulesEngine.parseGameState(data.fen)
+            val finalPosition = chessRulesEngine.withStatus(chessRulesEngine.parseGameState(data.fen))
             replayExportedMoves(ChessConstants.STARTING_POSITION_FEN, data.moves)
                 ?.takeIf { it.toPositionKey() == finalPosition.toPositionKey() }
                 ?: finalPosition
@@ -306,7 +306,7 @@ class ImportExportGameUseCase(
 
     private fun importFromFEN(fen: String): Result<ImportedGameData> {
         return try {
-            val gameState = chessRulesEngine.parseGameState(fen)
+            val gameState = chessRulesEngine.withStatus(chessRulesEngine.parseGameState(fen.trim()))
             Result.success(ImportedGameData(gameState = gameState))
         } catch (e: Exception) {
             Result.failure(IllegalArgumentException("Invalid FEN: ${e.message}"))
@@ -343,16 +343,6 @@ class ImportExportGameUseCase(
     }
 
     private fun normalizeSan(san: String): String = san.trimEnd('+', '#')
-    
-    private fun startingFen(gameState: GameState): String {
-        val plies = gameState.moveHistory.size
-        return when {
-            plies == 0 -> gameState.toFen()
-            gameState.positionHistory.size >= plies ->
-                gameState.positionHistory[gameState.positionHistory.size - plies]
-            else -> ChessConstants.STARTING_POSITION_FEN
-        }
-    }
 
     private fun getGameResult(gameState: GameState): String {
         return when {

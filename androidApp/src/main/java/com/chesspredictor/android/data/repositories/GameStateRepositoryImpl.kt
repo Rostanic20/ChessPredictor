@@ -5,8 +5,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.chesspredictor.data.repositories.GameStateRepository
+import com.chesspredictor.data.repositories.SavedGameCodec
 import com.chesspredictor.data.repositories.SavedGameState
-import com.chesspredictor.domain.entities.*
+import com.chesspredictor.domain.entities.EngineSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -29,6 +30,7 @@ class GameStateRepositoryImpl(
 
     companion object {
         private val FEN_KEY = stringPreferencesKey("fen")
+        private val START_FEN_KEY = stringPreferencesKey("start_fen")
         private val MOVE_HISTORY_KEY = stringPreferencesKey("move_history")
         private val CAPTURED_PIECES_KEY = stringPreferencesKey("captured_pieces")
         private val PLAY_MODE_KEY = stringPreferencesKey("play_mode")
@@ -42,8 +44,10 @@ class GameStateRepositoryImpl(
     override suspend fun saveGameState(gameState: SavedGameState) {
         context.gameStateDataStore.edit { preferences ->
             preferences[FEN_KEY] = gameState.fen
-            preferences[MOVE_HISTORY_KEY] = serializeMoveHistory(gameState.moveHistory)
-            preferences[CAPTURED_PIECES_KEY] = serializeCapturedPieces(gameState.capturedPieces)
+            val startFen = gameState.startFen
+            if (startFen != null) preferences[START_FEN_KEY] = startFen else preferences.remove(START_FEN_KEY)
+            preferences[MOVE_HISTORY_KEY] = SavedGameCodec.encodeMoves(gameState.moveHistory)
+            preferences[CAPTURED_PIECES_KEY] = SavedGameCodec.encodePieces(gameState.capturedPieces)
             preferences[PLAY_MODE_KEY] = gameState.playMode
             preferences[PLAYER_COLOR_KEY] = gameState.playerColor
             preferences[ENGINE_SETTINGS_KEY] = json.encodeToString(gameState.engineSettings)
@@ -53,37 +57,7 @@ class GameStateRepositoryImpl(
         }
     }
 
-    override suspend fun loadGameState(): SavedGameState? {
-        return context.gameStateDataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
-            .map { preferences ->
-                val fen = preferences[FEN_KEY]
-                if (fen != null) {
-                    SavedGameState(
-                        fen = fen,
-                        moveHistory = deserializeMoveHistory(preferences[MOVE_HISTORY_KEY] ?: ""),
-                        capturedPieces = deserializeCapturedPieces(preferences[CAPTURED_PIECES_KEY] ?: ""),
-                        playMode = preferences[PLAY_MODE_KEY] ?: "VS_ENGINE",
-                        playerColor = preferences[PLAYER_COLOR_KEY] ?: "WHITE",
-                        engineSettings = preferences[ENGINE_SETTINGS_KEY]?.let {
-                            json.decodeFromString<EngineSettings>(it)
-                        } ?: EngineSettings(),
-                        isFlipped = preferences[IS_FLIPPED_KEY] ?: false,
-                        showCoordinates = preferences[SHOW_COORDINATES_KEY] ?: true,
-                        timestamp = preferences[TIMESTAMP_KEY] ?: 0L
-                    )
-                } else {
-                    null
-                }
-            }
-            .first()
-    }
+    override suspend fun loadGameState(): SavedGameState? = observeGameState().first()
 
     override suspend fun clearGameState() {
         context.gameStateDataStore.edit { preferences ->
@@ -100,144 +74,24 @@ class GameStateRepositoryImpl(
                     throw exception
                 }
             }
-            .map { preferences ->
-                val fen = preferences[FEN_KEY]
-                if (fen != null) {
-                    SavedGameState(
-                        fen = fen,
-                        moveHistory = deserializeMoveHistory(preferences[MOVE_HISTORY_KEY] ?: ""),
-                        capturedPieces = deserializeCapturedPieces(preferences[CAPTURED_PIECES_KEY] ?: ""),
-                        playMode = preferences[PLAY_MODE_KEY] ?: "VS_ENGINE",
-                        playerColor = preferences[PLAYER_COLOR_KEY] ?: "WHITE",
-                        engineSettings = preferences[ENGINE_SETTINGS_KEY]?.let {
-                            json.decodeFromString<EngineSettings>(it)
-                        } ?: EngineSettings(),
-                        isFlipped = preferences[IS_FLIPPED_KEY] ?: false,
-                        showCoordinates = preferences[SHOW_COORDINATES_KEY] ?: true,
-                        timestamp = preferences[TIMESTAMP_KEY] ?: 0L
-                    )
-                } else {
-                    null
-                }
-            }
+            .map(::toSavedGameState)
     }
 
-    private fun serializeMoveHistory(moves: List<DetailedMove>): String {
-        return moves.joinToString(";") { move ->
-            val pieceCode = encodePiece(move.move.piece)
-            "${move.move.from.file}${move.move.from.rank}|" +
-            "${move.move.to.file}${move.move.to.rank}|" +
-            "${move.san}|${pieceCode}|${move.moveNumber}|${move.isWhiteMove}"
-        }
-    }
-
-    private fun deserializeMoveHistory(serialized: String): List<DetailedMove> {
-        if (serialized.isEmpty()) return emptyList()
-
-        return serialized.split(";").mapIndexedNotNull { index, moveStr ->
-            try {
-                val parts = moveStr.split("|")
-                if (parts.size >= 3) {
-                    val from = Square(parts[0][0], parts[0][1].toString().toInt())
-                    val to = Square(parts[1][0], parts[1][1].toString().toInt())
-                    val san = parts[2]
-                    val isWhiteMove = if (parts.size >= 6) parts[5].toBoolean() else index % 2 == 0
-                    val piece = if (parts.size >= 4) decodePiece(parts[3]) else pieceFromSan(san, isWhiteMove)
-                    val moveNumber = if (parts.size >= 5) parts[4].toIntOrNull() ?: (index / 2 + 1) else (index / 2 + 1)
-                    DetailedMove(
-                        move = ChessMove(
-                            from = from,
-                            to = to,
-                            piece = piece
-                        ),
-                        moveNumber = moveNumber,
-                        isWhiteMove = isWhiteMove,
-                        san = san,
-                        previousCastlingRights = CastlingRights(true, true, true, true),
-                        previousEnPassantSquare = null
-                    )
-                } else {
-                    null
-                }
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-
-    private fun encodePiece(piece: ChessPiece): String {
-        val type = when (piece) {
-            is ChessPiece.Pawn -> "P"
-            is ChessPiece.Knight -> "N"
-            is ChessPiece.Bishop -> "B"
-            is ChessPiece.Rook -> "R"
-            is ChessPiece.Queen -> "Q"
-            is ChessPiece.King -> "K"
-        }
-        return "$type${if (piece.color == ChessColor.WHITE) "W" else "B"}"
-    }
-
-    private fun decodePiece(code: String): ChessPiece {
-        val color = if (code.length >= 2 && code[1] == 'W') ChessColor.WHITE else ChessColor.BLACK
-        return when (code[0]) {
-            'N' -> ChessPiece.Knight(color)
-            'B' -> ChessPiece.Bishop(color)
-            'R' -> ChessPiece.Rook(color)
-            'Q' -> ChessPiece.Queen(color)
-            'K' -> ChessPiece.King(color)
-            else -> ChessPiece.Pawn(color)
-        }
-    }
-
-    private fun pieceFromSan(san: String, isWhiteMove: Boolean): ChessPiece {
-        val color = if (isWhiteMove) ChessColor.WHITE else ChessColor.BLACK
-        return when {
-            san.startsWith("O") -> ChessPiece.King(color)
-            san.isNotEmpty() && san[0] in "KQRBN" -> when (san[0]) {
-                'K' -> ChessPiece.King(color)
-                'Q' -> ChessPiece.Queen(color)
-                'R' -> ChessPiece.Rook(color)
-                'B' -> ChessPiece.Bishop(color)
-                'N' -> ChessPiece.Knight(color)
-                else -> ChessPiece.Pawn(color)
-            }
-            else -> ChessPiece.Pawn(color)
-        }
-    }
-
-    private fun serializeCapturedPieces(pieces: List<ChessPiece>): String {
-        return pieces.joinToString(",") { piece ->
-            val typeChar = when (piece) {
-                is ChessPiece.Pawn -> "P"
-                is ChessPiece.Knight -> "N"
-                is ChessPiece.Bishop -> "B"
-                is ChessPiece.Rook -> "R"
-                is ChessPiece.Queen -> "Q"
-                is ChessPiece.King -> "K"
-            }
-            "${typeChar}${if (piece.color == ChessColor.WHITE) "W" else "B"}"
-        }
-    }
-
-    private fun deserializeCapturedPieces(serialized: String): List<ChessPiece> {
-        if (serialized.isEmpty()) return emptyList()
-
-        return serialized.split(",").mapNotNull { pieceStr ->
-            try {
-                val type = pieceStr[0]
-                val color = if (pieceStr[1] == 'W') ChessColor.WHITE else ChessColor.BLACK
-                when (type) {
-                    'P' -> ChessPiece.Pawn(color)
-                    'N' -> ChessPiece.Knight(color)
-                    'B' -> ChessPiece.Bishop(color)
-                    'R' -> ChessPiece.Rook(color)
-                    'Q' -> ChessPiece.Queen(color)
-                    'K' -> ChessPiece.King(color)
-                    else -> null
-                }
-            } catch (e: Exception) {
-                null
-            }
-        }
+    private fun toSavedGameState(preferences: Preferences): SavedGameState? {
+        val fen = preferences[FEN_KEY] ?: return null
+        return SavedGameState(
+            fen = fen,
+            startFen = preferences[START_FEN_KEY],
+            moveHistory = SavedGameCodec.decodeMoves(preferences[MOVE_HISTORY_KEY] ?: ""),
+            capturedPieces = SavedGameCodec.decodePieces(preferences[CAPTURED_PIECES_KEY] ?: ""),
+            playMode = preferences[PLAY_MODE_KEY] ?: "VS_ENGINE",
+            playerColor = preferences[PLAYER_COLOR_KEY] ?: "WHITE",
+            engineSettings = preferences[ENGINE_SETTINGS_KEY]?.let {
+                json.decodeFromString<EngineSettings>(it)
+            } ?: EngineSettings(),
+            isFlipped = preferences[IS_FLIPPED_KEY] ?: false,
+            showCoordinates = preferences[SHOW_COORDINATES_KEY] ?: true,
+            timestamp = preferences[TIMESTAMP_KEY] ?: 0L
+        )
     }
 }

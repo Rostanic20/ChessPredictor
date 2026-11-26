@@ -7,7 +7,6 @@ import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.usecases.ChessRulesEngine
-import com.chesspredictor.presentation.ChessConstants
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,46 +90,29 @@ class MoveController(
         val currentState = gameStateManager.currentGameState ?: return false
         if (moves.size != currentState.moveHistory.size) return false
 
-        val movesToKeep = moves.dropLast(1)
-        rebuildPositionFromMoves(movesToKeep)
-        return true
-    }
-
-    fun rebuildPositionFromMoves(moves: List<DetailedMove>) {
-        val gameState = replayMoves(moves)
+        val gameState = replay(currentState.startingFen(), moves.dropLast(1)) ?: return false
         gameStateManager.updateFromGameState(gameState)
         gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
         animationController.clearAnimations()
+        return true
     }
 
-    fun reconstructMoveHistory(savedMoves: List<DetailedMove>): List<DetailedMove> {
-        if (savedMoves.isEmpty()) return emptyList()
+    fun restoreGame(startFen: String, moves: List<DetailedMove>, finalFen: String): GameState {
+        val finalPosition = chessRulesEngine.withStatus(chessRulesEngine.parseGameState(finalFen))
+        return replay(startFen, moves)?.takeIf { it.toPositionKey() == finalPosition.toPositionKey() }
+            ?: finalPosition
+    }
 
-        val reconstructedMoves = mutableListOf<DetailedMove>()
-        var currentState = getInitialGameState()
-
-        for ((index, savedMove) in savedMoves.withIndex()) {
-            val correctPiece = currentState.board[savedMove.move.from] ?: break
-            val correctedMove = savedMove.copy(
-                move = savedMove.move.copy(piece = correctPiece),
-                moveNumber = index + 1,
-                isWhiteMove = currentState.turn == ChessColor.WHITE
+    private fun replay(startFen: String, moves: List<DetailedMove>): GameState? {
+        var gameState = chessRulesEngine.parseGameState(startFen)
+        for (saved in moves) {
+            val piece = gameState.board[saved.move.from] ?: return null
+            val move = saved.move.copy(
+                piece = piece,
+                capturedPiece = gameState.board[saved.move.to],
+                promotion = saved.move.promotion
             )
-
-            val newState = chessRulesEngine.makeMove(currentState, correctedMove.move) ?: break
-            currentState = newState
-            reconstructedMoves.add(correctedMove)
-        }
-        return reconstructedMoves
-    }
-
-    private fun getInitialGameState(): GameState =
-        chessRulesEngine.parseGameState(ChessConstants.STARTING_POSITION_FEN)
-
-    private fun replayMoves(moves: List<DetailedMove>): GameState {
-        var gameState = getInitialGameState()
-        for (detailedMove in moves) {
-            gameState = chessRulesEngine.makeMove(gameState, detailedMove.move) ?: break
+            gameState = chessRulesEngine.makeMove(gameState, move) ?: return null
         }
         return gameState
     }

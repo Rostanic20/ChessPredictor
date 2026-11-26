@@ -1,5 +1,6 @@
 package com.chesspredictor.domain.entities
 
+import com.chesspredictor.domain.utils.ChessConstants
 import com.chesspredictor.domain.utils.ChessUtils
 
 data class GameState(
@@ -67,6 +68,15 @@ data class GameState(
     fun toPositionKey(): String {
         val fenParts = toFen().split(" ")
         return "${fenParts[0]} ${fenParts[1]} ${fenParts[2]} ${fenParts[3]}"
+    }
+
+    fun startingFen(): String {
+        val plies = moveHistory.size
+        return when {
+            plies == 0 -> toFen()
+            positionHistory.size >= plies -> positionHistory[positionHistory.size - plies]
+            else -> ChessConstants.STARTING_FEN
+        }
     }
 }
 

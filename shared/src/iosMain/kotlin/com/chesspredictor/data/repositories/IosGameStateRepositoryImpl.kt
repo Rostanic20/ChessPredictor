@@ -1,7 +1,6 @@
 package com.chesspredictor.data.repositories
 
-import com.chesspredictor.domain.entities.*
-import com.chesspredictor.utils.TimeProvider
+import com.chesspredictor.domain.entities.EngineSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +19,7 @@ class IosGameStateRepositoryImpl : GameStateRepository {
 
     companion object {
         private const val KEY_FEN = "chess_fen"
+        private const val KEY_START_FEN = "chess_start_fen"
         private const val KEY_MOVE_HISTORY = "chess_move_history"
         private const val KEY_CAPTURED_PIECES = "chess_captured_pieces"
         private const val KEY_PLAY_MODE = "chess_play_mode"
@@ -32,8 +32,10 @@ class IosGameStateRepositoryImpl : GameStateRepository {
 
     override suspend fun saveGameState(gameState: SavedGameState) {
         defaults.setObject(gameState.fen, KEY_FEN)
-        defaults.setObject(serializeMoveHistory(gameState.moveHistory), KEY_MOVE_HISTORY)
-        defaults.setObject(serializeCapturedPieces(gameState.capturedPieces), KEY_CAPTURED_PIECES)
+        val startFen = gameState.startFen
+        if (startFen != null) defaults.setObject(startFen, KEY_START_FEN) else defaults.removeObjectForKey(KEY_START_FEN)
+        defaults.setObject(SavedGameCodec.encodeMoves(gameState.moveHistory), KEY_MOVE_HISTORY)
+        defaults.setObject(SavedGameCodec.encodePieces(gameState.capturedPieces), KEY_CAPTURED_PIECES)
         defaults.setObject(gameState.playMode, KEY_PLAY_MODE)
         defaults.setObject(gameState.playerColor, KEY_PLAYER_COLOR)
         defaults.setObject(json.encodeToString(gameState.engineSettings), KEY_ENGINE_SETTINGS)
@@ -48,8 +50,9 @@ class IosGameStateRepositoryImpl : GameStateRepository {
         val fen = defaults.stringForKey(KEY_FEN) ?: return null
         val state = SavedGameState(
             fen = fen,
-            moveHistory = deserializeMoveHistory(defaults.stringForKey(KEY_MOVE_HISTORY) ?: ""),
-            capturedPieces = deserializeCapturedPieces(defaults.stringForKey(KEY_CAPTURED_PIECES) ?: ""),
+            startFen = defaults.stringForKey(KEY_START_FEN),
+            moveHistory = SavedGameCodec.decodeMoves(defaults.stringForKey(KEY_MOVE_HISTORY) ?: ""),
+            capturedPieces = SavedGameCodec.decodePieces(defaults.stringForKey(KEY_CAPTURED_PIECES) ?: ""),
             playMode = defaults.stringForKey(KEY_PLAY_MODE) ?: "VS_ENGINE",
             playerColor = defaults.stringForKey(KEY_PLAYER_COLOR) ?: "WHITE",
             engineSettings = defaults.stringForKey(KEY_ENGINE_SETTINGS)?.let {
@@ -64,7 +67,7 @@ class IosGameStateRepositoryImpl : GameStateRepository {
     }
 
     override suspend fun clearGameState() {
-        listOf(KEY_FEN, KEY_MOVE_HISTORY, KEY_CAPTURED_PIECES, KEY_PLAY_MODE,
+        listOf(KEY_FEN, KEY_START_FEN, KEY_MOVE_HISTORY, KEY_CAPTURED_PIECES, KEY_PLAY_MODE,
             KEY_PLAYER_COLOR, KEY_ENGINE_SETTINGS, KEY_IS_FLIPPED,
             KEY_SHOW_COORDINATES, KEY_TIMESTAMP).forEach {
             defaults.removeObjectForKey(it)
@@ -74,115 +77,4 @@ class IosGameStateRepositoryImpl : GameStateRepository {
     }
 
     override fun observeGameState(): Flow<SavedGameState?> = _gameStateFlow.asStateFlow()
-
-    private fun serializeMoveHistory(moves: List<DetailedMove>): String {
-        return moves.joinToString(";") { move ->
-            val pieceCode = encodePiece(move.move.piece)
-            "${move.move.from.file}${move.move.from.rank}|" +
-            "${move.move.to.file}${move.move.to.rank}|" +
-            "${move.san}|${pieceCode}|${move.moveNumber}|${move.isWhiteMove}"
-        }
-    }
-
-    private fun deserializeMoveHistory(serialized: String): List<DetailedMove> {
-        if (serialized.isEmpty()) return emptyList()
-        return serialized.split(";").mapIndexedNotNull { index, moveStr ->
-            try {
-                val parts = moveStr.split("|")
-                if (parts.size >= 3) {
-                    val from = Square(parts[0][0], parts[0][1].toString().toInt())
-                    val to = Square(parts[1][0], parts[1][1].toString().toInt())
-                    val san = parts[2]
-                    val isWhiteMove = if (parts.size >= 6) parts[5].toBoolean() else index % 2 == 0
-                    val piece = if (parts.size >= 4) decodePiece(parts[3]) else pieceFromSan(san, isWhiteMove)
-                    val moveNumber = if (parts.size >= 5) parts[4].toIntOrNull() ?: (index / 2 + 1) else (index / 2 + 1)
-                    DetailedMove(
-                        move = ChessMove(
-                            from = from,
-                            to = to,
-                            piece = piece
-                        ),
-                        moveNumber = moveNumber,
-                        isWhiteMove = isWhiteMove,
-                        san = san,
-                        previousCastlingRights = CastlingRights(true, true, true, true),
-                        previousEnPassantSquare = null
-                    )
-                } else null
-            } catch (_: Exception) { null }
-        }
-    }
-
-    private fun encodePiece(piece: ChessPiece): String {
-        val type = when (piece) {
-            is ChessPiece.Pawn -> "P"
-            is ChessPiece.Knight -> "N"
-            is ChessPiece.Bishop -> "B"
-            is ChessPiece.Rook -> "R"
-            is ChessPiece.Queen -> "Q"
-            is ChessPiece.King -> "K"
-        }
-        return "$type${if (piece.color == ChessColor.WHITE) "W" else "B"}"
-    }
-
-    private fun decodePiece(code: String): ChessPiece {
-        val color = if (code.length >= 2 && code[1] == 'W') ChessColor.WHITE else ChessColor.BLACK
-        return when (code[0]) {
-            'N' -> ChessPiece.Knight(color)
-            'B' -> ChessPiece.Bishop(color)
-            'R' -> ChessPiece.Rook(color)
-            'Q' -> ChessPiece.Queen(color)
-            'K' -> ChessPiece.King(color)
-            else -> ChessPiece.Pawn(color)
-        }
-    }
-
-    private fun pieceFromSan(san: String, isWhiteMove: Boolean): ChessPiece {
-        val color = if (isWhiteMove) ChessColor.WHITE else ChessColor.BLACK
-        return when {
-            san.startsWith("O") -> ChessPiece.King(color)
-            san.isNotEmpty() && san[0] in "KQRBN" -> when (san[0]) {
-                'K' -> ChessPiece.King(color)
-                'Q' -> ChessPiece.Queen(color)
-                'R' -> ChessPiece.Rook(color)
-                'B' -> ChessPiece.Bishop(color)
-                'N' -> ChessPiece.Knight(color)
-                else -> ChessPiece.Pawn(color)
-            }
-            else -> ChessPiece.Pawn(color)
-        }
-    }
-
-    private fun serializeCapturedPieces(pieces: List<ChessPiece>): String {
-        return pieces.joinToString(",") { piece ->
-            val typeChar = when (piece) {
-                is ChessPiece.Pawn -> "P"
-                is ChessPiece.Knight -> "N"
-                is ChessPiece.Bishop -> "B"
-                is ChessPiece.Rook -> "R"
-                is ChessPiece.Queen -> "Q"
-                is ChessPiece.King -> "K"
-            }
-            "$typeChar${if (piece.color == ChessColor.WHITE) "W" else "B"}"
-        }
-    }
-
-    private fun deserializeCapturedPieces(serialized: String): List<ChessPiece> {
-        if (serialized.isEmpty()) return emptyList()
-        return serialized.split(",").mapNotNull { pieceStr ->
-            try {
-                val type = pieceStr[0]
-                val color = if (pieceStr[1] == 'W') ChessColor.WHITE else ChessColor.BLACK
-                when (type) {
-                    'P' -> ChessPiece.Pawn(color)
-                    'N' -> ChessPiece.Knight(color)
-                    'B' -> ChessPiece.Bishop(color)
-                    'R' -> ChessPiece.Rook(color)
-                    'Q' -> ChessPiece.Queen(color)
-                    'K' -> ChessPiece.King(color)
-                    else -> null
-                }
-            } catch (_: Exception) { null }
-        }
-    }
 }

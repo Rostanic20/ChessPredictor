@@ -450,7 +450,8 @@ class ChessBoardViewModel(
                         engineSettings = settingsManager.engineSettings.value,
                         isFlipped = settingsManager.isFlipped.value,
                         showCoordinates = settingsManager.showCoordinates.value,
-                        positionEvaluations = emptyList()
+                        positionEvaluations = emptyList(),
+                        startFen = gameState.startingFen()
                     )
                     repo.saveGameState(savedState)
                 } catch (e: Exception) {
@@ -466,15 +467,21 @@ class ChessBoardViewModel(
         gameStateRepository?.let { repo ->
             try {
                 val savedState = repo.loadGameState() ?: return
-                val gameState = chessRulesEngine.parseGameState(savedState.fen)
-                val correctedHistory = moveController.reconstructMoveHistory(savedState.moveHistory)
+                val restored = moveController.restoreGame(
+                    startFen = savedState.startFen ?: ChessConstants.STARTING_POSITION_FEN,
+                    moves = savedState.moveHistory,
+                    finalFen = savedState.fen
+                )
+                val gameState = if (restored.moveHistory.size == savedState.moveHistory.size) {
+                    restored
+                } else {
+                    restored.copy(capturedPieces = savedState.capturedPieces)
+                }
 
                 cancelPendingWork()
-                gameStateManager.updateFromGameState(gameState.copy(
-                    moveHistory = correctedHistory,
-                    capturedPieces = savedState.capturedPieces
-                ))
-                gameStateManager.setLastMove(savedState.moveHistory.lastOrNull()?.move)
+                gameStateManager.updateFromGameState(gameState)
+                gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
+                _currentOpening.value = detectOpeningSafe(gameState.moveHistory)
 
                 settingsManager.setFlipped(savedState.isFlipped)
                 settingsManager.setShowCoordinates(savedState.showCoordinates)

@@ -32,13 +32,7 @@ class ChessRulesEngine {
             return null
         }
         
-        var newState = moveExecutor.executeMove(gameState, move)
-        newState = newState.copy(
-            isCheck = checkDetector.isKingInCheck(newState, newState.turn),
-            isCheckmate = checkDetector.isCheckmate(newState),
-            isStalemate = checkDetector.isStalemate(newState),
-            isDraw = drawDetector.isDraw(newState)
-        )
+        var newState = withStatus(moveExecutor.executeMove(gameState, move))
         
         if (newState.moveHistory.isNotEmpty()) {
             val lastMove = newState.moveHistory.last()
@@ -55,6 +49,13 @@ class ChessRulesEngine {
         return newState
     }
     
+    fun withStatus(gameState: GameState): GameState = gameState.copy(
+        isCheck = checkDetector.isKingInCheck(gameState, gameState.turn),
+        isCheckmate = checkDetector.isCheckmate(gameState),
+        isStalemate = checkDetector.isStalemate(gameState),
+        isDraw = drawDetector.isDraw(gameState)
+    )
+
     fun getLegalMoves(gameState: GameState, from: Square? = null): List<ChessMove> {
         val allMoves = moveGenerator.getLegalMoves(gameState)
         return if (from != null) {

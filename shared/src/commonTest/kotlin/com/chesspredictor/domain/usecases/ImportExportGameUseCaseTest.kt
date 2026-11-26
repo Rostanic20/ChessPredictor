@@ -127,6 +127,12 @@ class ImportExportGameUseCaseTest {
     }
 
     @Test
+    fun fenImportOfAMatedPositionReportsTheMate() {
+        val result = useCase.importGame("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3\n", ExportFormat.FEN)
+        assertTrue(result.getOrThrow().gameState.isCheckmate)
+    }
+
+    @Test
     fun knightShuffleIsDrawnOnTheThirdOccurrence() {
         val twice = play(startPosition(), "g1f3", "g8f6", "f3g1", "f6g8")
         assertFalse(twice.isDraw)
