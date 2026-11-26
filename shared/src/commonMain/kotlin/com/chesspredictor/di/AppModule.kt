@@ -6,11 +6,15 @@ import com.chesspredictor.data.repositories.ChessEngineRepositoryImpl
 import com.chesspredictor.data.utils.MoveParserImpl
 import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.domain.usecases.GetBestMoveUseCase
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AppModule {
     private val stockfishDataSource by lazy { createStockfishDataSource() }
     private val moveParser by lazy { MoveParserImpl() }
-    
+    private val engineInitMutex = Mutex()
+    private var engineInitialized = false
+
     val chessEngineRepository: ChessEngineRepository by lazy {
         ChessEngineRepositoryImpl(stockfishDataSource as ChessEngineDataSource, moveParser)
     }
@@ -20,7 +24,11 @@ class AppModule {
     }
     
     suspend fun initializeEngine() {
-        (stockfishDataSource as ChessEngineDataSource).initialize()
+        engineInitMutex.withLock {
+            if (engineInitialized) return
+            (stockfishDataSource as ChessEngineDataSource).initialize()
+            engineInitialized = true
+        }
     }
 }
 

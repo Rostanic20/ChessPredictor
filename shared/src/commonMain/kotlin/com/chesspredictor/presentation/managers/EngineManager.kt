@@ -9,8 +9,12 @@ import com.chesspredictor.domain.entities.GameTimeControl
 import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.utils.ChessLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -81,14 +85,21 @@ class EngineManager(
         movesSinceLastDrawOffer = 0
     }
     
-    private var requestBoardState: ChessBoard? = null
-    
+    private var moveJob: Job? = null
+
+    fun cancelPendingMove() {
+        moveJob?.cancel()
+        moveJob = null
+        _isThinking.value = false
+    }
+
     fun requestEngineMove(
         board: ChessBoard,
         settings: EngineSettings,
         onMoveReady: (ChessMove) -> Unit
     ) {
-        scope.launch {
+        moveJob?.cancel()
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
                 if (!_isReady.value) {
                     ChessLogger.error(TAG, "Engine not ready for move request - initializing...")
@@ -104,7 +115,10 @@ class EngineManager(
                 ChessLogger.info(TAG, "Starting engine move request")
                 ChessLogger.info(TAG, "Engine request - Board FEN: ${board.fen}")
                 ChessLogger.info(TAG, "Engine request - Board turn: ${board.turn}")
-                
+
+                _isThinking.value = true
+                _error.value = null
+
                 val finalSettings = if (settings.timeLimit <= 200) {
                     settings
                 } else if (settings.humanStyle && humanBehaviorManager != null) {
@@ -122,11 +136,6 @@ class EngineManager(
                 } else {
                     settings
                 }
-                
-                _isThinking.value = true
-                _error.value = null
-
-                requestBoardState = board
 
                 val move = repository.analyzeBestMove(board, finalSettings)
                 if (move != null) {
@@ -163,18 +172,25 @@ class EngineManager(
                     }
                     
                     ChessLogger.info(TAG, "Engine move successful: ${finalMove.from} -> ${finalMove.to}")
+                    ensureActive()
                     onMoveReady(finalMove)
                 } else {
                     ChessLogger.warning(TAG, "Engine returned no move")
                 }
-                
-                _isThinking.value = false
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _isThinking.value = false
                 _error.value = EngineError.ANALYSIS_FAILED(e.message ?: "Unknown error")
                 ChessLogger.error(TAG, "Engine move request failed", e)
+            } finally {
+                if (moveJob === coroutineContext[Job]) {
+                    moveJob = null
+                    _isThinking.value = false
+                }
             }
         }
+        moveJob = job
+        job.start()
     }
     
     fun clearError() {
