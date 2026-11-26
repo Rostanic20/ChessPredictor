@@ -41,6 +41,7 @@ import com.chesspredictor.presentation.ChessError
 import com.chesspredictor.utils.TimeProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 
 class ChessBoardViewModel(
@@ -75,6 +77,7 @@ class ChessBoardViewModel(
     private val _isInitializing = MutableStateFlow(true)
     private val _currentOpening = MutableStateFlow<OpeningInfo?>(null)
     private var moveStartTime = 0L
+    private var pendingMoveJob: Job? = null
 
     val currentOpening: StateFlow<OpeningInfo?> = _currentOpening.asStateFlow()
     val isThinking: StateFlow<Boolean> = engineManager.isThinking
@@ -227,10 +230,17 @@ class ChessBoardViewModel(
         }
     }
 
+    private fun cancelPendingWork() {
+        engineManager.cancelPendingMove()
+        pendingMoveJob?.cancel()
+        pendingMoveJob = null
+        animationController.clearAnimations()
+    }
+
     private fun resetToNewGame() {
+        cancelPendingWork()
         gameStateManager.reset()
         moveController.clearSelection()
-        animationController.clearAnimations()
         settingsManager.resetPlayerTimes()
         moveStartTime = 0L
         _currentOpening.value = null
@@ -240,6 +250,7 @@ class ChessBoardViewModel(
 
     fun onSquareClick(square: Square) {
         if (animationController.isAnimating()) return
+        if (gameStateManager.isGameOver()) return
         if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) return
 
         val boardState = gameStateManager.boardState.value
@@ -293,8 +304,9 @@ class ChessBoardViewModel(
         updatePlayerTime(result.oldGameState.turn, timeSpent)
         animationController.startMoveAnimation(result.move, result.oldGameState, result.newGameState, settingsManager.isFlipped.value)
 
-        viewModelScope.launch {
+        pendingMoveJob = viewModelScope.launch {
             delay(animationController.getAnimationDuration())
+            pendingMoveJob = null
             applyMoveResult(result, timeSpent)
         }
     }
@@ -334,6 +346,7 @@ class ChessBoardViewModel(
 
     private fun getEngineMove() {
         if (engineManager.isThinking.value) return
+        if (gameStateManager.isGameOver()) return
 
         if (!engineManager.isReady.value) {
             viewModelScope.launch {
@@ -349,19 +362,27 @@ class ChessBoardViewModel(
 
     private fun requestEngineMoveInternal() {
         moveStartTime = TimeProvider.currentTimeMillis()
+        val board = gameStateManager.board.value
         engineManager.requestEngineMove(
-            board = gameStateManager.board.value,
+            board = board,
             settings = settingsManager.engineSettings.value
         ) { move ->
+            if (gameStateManager.board.value.fen != board.fen) return@requestEngineMove
             executeMove(move.from, move.to, move.promotion)
         }
     }
 
     fun undoLastMove() {
         if (_isInitializing.value) return
-        if (moveController.undoLastMove()) {
-            _currentOpening.value = detectOpeningSafe(gameStateManager.moveHistory.value)
-            saveGameState()
+        if (!moveController.undoLastMove()) return
+        engineManager.cancelPendingMove()
+        while (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
+            if (!moveController.undoLastMove()) break
+        }
+        _currentOpening.value = detectOpeningSafe(gameStateManager.moveHistory.value)
+        saveGameState()
+        if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
+            getEngineMove()
         }
     }
 
@@ -392,11 +413,16 @@ class ChessBoardViewModel(
     fun declineDrawOffer() = engineManager.clearDrawOffer()
 
     fun setPlayMode(mode: PlayMode) {
+        engineManager.cancelPendingMove()
         settingsManager.setPlayMode(mode)
         saveGameState()
+        if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
+            getEngineMove()
+        }
     }
 
     fun setPlayerColor(color: PlayerColor) {
+        engineManager.cancelPendingMove()
         settingsManager.setPlayerColor(color)
         saveGameState()
         if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
@@ -448,6 +474,7 @@ class ChessBoardViewModel(
                 val gameState = chessRulesEngine.parseGameState(savedState.fen)
                 val correctedHistory = moveController.reconstructMoveHistory(savedState.moveHistory)
 
+                cancelPendingWork()
                 gameStateManager.updateFromGameState(gameState.copy(
                     moveHistory = correctedHistory,
                     capturedPieces = savedState.capturedPieces
@@ -497,27 +524,29 @@ class ChessBoardViewModel(
 
     fun importGame(content: String, format: ExportFormat) {
         viewModelScope.launch {
-            importExportGameUseCase.importGame(content, format)
+            withContext(Dispatchers.Default) { importExportGameUseCase.importGame(content, format) }
                 .onSuccess { importedData ->
+                    cancelPendingWork()
                     gameStateManager.updateFromGameState(importedData.gameState)
                     gameStateManager.setLastMove(importedData.gameState.moveHistory.lastOrNull()?.move)
                     moveController.clearSelection()
                     animationController.clearAnimations()
 
                     importedData.additionalData?.let { data ->
-                        data.playMode?.let { settingsManager.setPlayMode(PlayMode.valueOf(it)) }
-                        data.playerColor?.let { settingsManager.setPlayerColor(PlayerColor.valueOf(it)) }
-                        data.engineDifficulty?.let { difficulty ->
+                        PlayMode.entries.find { it.name == data.playMode }?.let(settingsManager::setPlayMode)
+                        PlayerColor.entries.find { it.name == data.playerColor }?.let(settingsManager::setPlayerColor)
+                        EngineDifficulty.entries.find { it.name == data.engineDifficulty }?.let { difficulty ->
                             settingsManager.setEngineSettings(
-                                settingsManager.engineSettings.value.copy(
-                                    difficulty = EngineDifficulty.valueOf(difficulty)
-                                )
+                                settingsManager.engineSettings.value.copy(difficulty = difficulty)
                             )
                         }
                     }
 
-                    _currentOpening.value = openingDetector.detectOpening(importedData.gameState.moveHistory)
+                    _currentOpening.value = detectOpeningSafe(importedData.gameState.moveHistory)
                     saveGameState()
+                    if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
+                        getEngineMove()
+                    }
                 }
                 .onFailure { error ->
                     errorManager.reportError(ChessError.ImportGameError(

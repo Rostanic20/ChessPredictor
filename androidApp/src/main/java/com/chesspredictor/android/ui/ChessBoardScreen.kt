@@ -57,11 +57,7 @@ fun ChessBoardScreen(
     
     var showImportDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(Unit) {
-        viewModel.initializeBoard()
-    }
-    
+
     if (uiState.showNewGameDialog) {
         NewGameConfirmationDialog(
             onConfirm = viewModel::confirmNewGame,
