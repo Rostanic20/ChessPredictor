@@ -25,8 +25,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.chesspredictor.domain.entities.ExportFormat
 import com.chesspredictor.presentation.viewmodels.ChessBoardViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import java.io.ByteArrayOutputStream
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.text.font.FontFamily
@@ -216,6 +221,7 @@ fun ImportGameDialog(
 ) {
     var selectedFormat by remember { mutableStateOf(ExportFormat.PGN) }
     var importContent by remember { mutableStateOf("") }
+    var fileError by remember { mutableStateOf<String?>(null) }
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
 
@@ -224,18 +230,12 @@ fun ImportGameDialog(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { fileUri ->
-            scope.launch {
-                try {
-                    val content = context.contentResolver.openInputStream(fileUri)?.use {
-                        it.readBytes().decodeToString()
-                    }
-                    content?.let {
-                        importContent = it
-                    }
-                } catch (e: Exception) {
-                }
-            }
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            fileError = null
+            runCatching { withContext(Dispatchers.IO) { readGameFile(context, uri) } }
+                .onSuccess { importContent = it }
+                .onFailure { fileError = it.message ?: "Could not read the file" }
         }
     }
 
@@ -333,13 +333,22 @@ fun ImportGameDialog(
 
                     OutlinedButton(
                         onClick = {
-                            filePickerLauncher.launch("text/*")
+                            filePickerLauncher.launch("*/*")
                         }
                     ) {
                         Icon(Icons.Default.Folder, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("File")
                     }
+                }
+
+                fileError?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -377,4 +386,21 @@ fun ImportGameDialog(
             }
         }
     }
+}
+
+private const val MAX_IMPORT_BYTES = 1_000_000
+
+private fun readGameFile(context: Context, uri: Uri): String {
+    val input = context.contentResolver.openInputStream(uri) ?: error("Could not open the file")
+    val bytes = ByteArrayOutputStream()
+    input.use { stream ->
+        val chunk = ByteArray(8192)
+        while (true) {
+            val read = stream.read(chunk)
+            if (read < 0) break
+            bytes.write(chunk, 0, read)
+            if (bytes.size() > MAX_IMPORT_BYTES) error("File is larger than 1 MB")
+        }
+    }
+    return bytes.toByteArray().decodeToString()
 }

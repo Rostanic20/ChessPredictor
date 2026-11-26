@@ -51,12 +51,47 @@ fun ChessBoardScreen(
     val isThinking by viewModel.isThinking.collectAsState()
     val isEngineReady by viewModel.isEngineReady.collectAsState()
     val currentOpening by viewModel.currentOpening.collectAsState()
-    
+    val errorState by viewModel.errorState.collectAsState()
+    val engineError by viewModel.engineError.collectAsState()
+    val shouldOfferDraw by viewModel.shouldOfferDraw.collectAsState()
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    
+
     var showImportDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var pendingPromotion by remember { mutableStateOf<Pair<Square, Square>?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorState) {
+        val error = errorState ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(error.message)
+        viewModel.dismissError()
+    }
+
+    LaunchedEffect(engineError) {
+        val error = engineError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(error.errorMessage())
+        viewModel.dismissEngineError()
+    }
+
+    pendingPromotion?.let { (from, to) ->
+        PromotionDialog(
+            color = uiState.currentTurn,
+            onSelect = { piece ->
+                pendingPromotion = null
+                viewModel.executePromotionMove(from, to, piece)
+            },
+            onDismiss = { pendingPromotion = null }
+        )
+    }
+
+    if (shouldOfferDraw) {
+        DrawOfferDialog(
+            onAccept = viewModel::acceptDrawOffer,
+            onDecline = viewModel::declineDrawOffer
+        )
+    }
 
     if (uiState.showNewGameDialog) {
         NewGameConfirmationDialog(
@@ -81,6 +116,7 @@ fun ChessBoardScreen(
     
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ChessAppBar(
                 showCoordinates = uiState.showCoordinates,
@@ -100,7 +136,14 @@ fun ChessBoardScreen(
             isEngineReady = isEngineReady,
             currentOpening = currentOpening,
             isLandscape = isLandscape,
-            onSquareClick = viewModel::onSquareClick,
+            onSquareClick = { square ->
+                val from = uiState.selectedSquare
+                if (from != null && viewModel.isPromotionMove(square)) {
+                    pendingPromotion = from to square
+                } else {
+                    viewModel.onSquareClick(square)
+                }
+            },
             onPlayModeChange = viewModel::setPlayMode,
             onPlayerColorChange = viewModel::setPlayerColor,
             onEngineSettingsChange = viewModel::setEngineSettings

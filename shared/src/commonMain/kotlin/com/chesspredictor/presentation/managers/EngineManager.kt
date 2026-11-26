@@ -340,7 +340,7 @@ class EngineManager(
             }
             balance += value
         }
-        return if (board.turn == ChessColor.WHITE) -balance else balance
+        return if (board.turn == ChessColor.WHITE) balance else -balance
     }
 }
 

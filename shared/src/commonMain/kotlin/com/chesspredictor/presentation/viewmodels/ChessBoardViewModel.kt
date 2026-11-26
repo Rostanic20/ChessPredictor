@@ -232,6 +232,7 @@ class ChessBoardViewModel(
 
     private fun cancelPendingWork() {
         engineManager.cancelPendingMove()
+        engineManager.clearDrawOffer()
         pendingMoveJob?.cancel()
         pendingMoveJob = null
         animationController.clearAnimations()
@@ -289,6 +290,12 @@ class ChessBoardViewModel(
             PlayMode.VS_HUMAN -> true
             PlayMode.VS_ENGINE -> piece.color == currentTurn
         }
+    }
+
+    fun isPromotionMove(to: Square): Boolean {
+        val from = moveController.getSelectedSquare() ?: return false
+        val piece = gameStateManager.boardState.value[from]
+        return piece is ChessPiece.Pawn && (to.rank == 1 || to.rank == 8) && moveController.isMoveValid(to)
     }
 
     fun executePromotionMove(from: Square, to: Square, promotionPiece: ChessPiece) {
@@ -401,6 +408,7 @@ class ChessBoardViewModel(
 
     fun cancelNewGame() = settingsManager.hideNewGameDialog()
     fun dismissError() = errorManager.clearError()
+    fun dismissEngineError() = engineManager.clearError()
     fun toggleBoardFlip() = settingsManager.toggleFlip()
     fun toggleCoordinates() { settingsManager.toggleCoordinates(); saveGameState() }
     fun toggleBoardFlipAndSave() { settingsManager.toggleFlip(); saveGameState() }
