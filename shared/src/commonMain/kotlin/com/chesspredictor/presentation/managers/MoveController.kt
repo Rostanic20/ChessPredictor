@@ -45,6 +45,7 @@ class MoveController(
 
     fun makeMove(from: Square, to: Square, promotionPiece: ChessPiece? = null): MoveResult? {
         if (animationController.isAnimating()) return null
+        if (gameStateManager.isGameOver()) return null
 
         val gameState = gameStateManager.currentGameState ?: return null
         val piece = gameState.board[from] ?: return null

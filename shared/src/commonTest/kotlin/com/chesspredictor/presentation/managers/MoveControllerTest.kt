@@ -4,12 +4,14 @@ import com.chesspredictor.data.repositories.SavedGameCodec
 import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
+import com.chesspredictor.domain.entities.GameEnding
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.usecases.ChessRulesEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MoveControllerTest {
@@ -72,6 +74,15 @@ class MoveControllerTest {
         assertEquals(mated, restored.toFen())
         assertTrue(restored.isCheckmate)
         assertEquals(0, restored.moveHistory.size)
+    }
+
+    @Test
+    fun noMoveIsAcceptedAfterAFlagEvenAPromotion() {
+        gameStateManager.updateFromGameState(engine.parseGameState(setUpFen))
+        gameStateManager.endGame(GameEnding.WHITE_OUT_OF_TIME, isDraw = false)
+
+        assertNull(controller.makeMove(Square.fromString("b7"), Square.fromString("b8"), ChessPiece.Queen(ChessColor.WHITE)))
+        assertEquals(GameEnding.WHITE_OUT_OF_TIME, gameStateManager.gameStatus.value.ending)
     }
 
     @Test
