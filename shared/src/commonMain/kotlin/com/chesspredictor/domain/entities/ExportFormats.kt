@@ -30,7 +30,8 @@ data class GameData(
     val fen: String,
     val moves: List<ExportedMove>,
     val currentPly: Int,
-    val timeControl: String? = null
+    val timeControl: String? = null,
+    val startFen: String? = null
 )
 
 @Serializable

@@ -92,18 +92,29 @@ class DrawDetectorTest {
     }
 
     @Test
-    fun testThreefoldRepetitionTriggered() {
+    fun testThreefoldRepetitionTriggeredOnThirdOccurrence() {
         val positionFen = "8/8/8/3k4/8/8/8/4K2R w - -"
-        val state = fenParser.parseGameState("$positionFen 0 1").copy(
+        val state = fenParser.parseGameState("$positionFen 4 3").copy(
             positionHistory = listOf(
                 "$positionFen 0 1",
                 "8/8/8/8/3k4/8/8/4K2R b - - 1 1",
                 "$positionFen 2 2",
-                "8/8/8/8/3k4/8/8/4K2R b - - 3 2",
-                "$positionFen 4 3"
+                "8/8/8/8/3k4/8/8/4K2R b - - 3 2"
             )
         )
         assertTrue(drawDetector.isThreefoldRepetition(state))
+    }
+
+    @Test
+    fun testSecondOccurrenceIsNotThreefoldRepetition() {
+        val positionFen = "8/8/8/3k4/8/8/8/4K2R w - -"
+        val state = fenParser.parseGameState("$positionFen 2 2").copy(
+            positionHistory = listOf(
+                "$positionFen 0 1",
+                "8/8/8/8/3k4/8/8/4K2R b - - 1 1"
+            )
+        )
+        assertFalse(drawDetector.isThreefoldRepetition(state))
     }
 
     @Test
