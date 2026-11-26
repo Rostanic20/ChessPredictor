@@ -5,11 +5,7 @@ import com.chesspredictor.domain.entities.ChessOpening
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.GameState
-import com.chesspredictor.domain.entities.OpeningCategory
-import com.chesspredictor.domain.entities.OpeningDifficulty
 import com.chesspredictor.domain.entities.OpeningInfo
-import com.chesspredictor.domain.entities.OpeningStatistics
-import com.chesspredictor.domain.entities.OpeningTheme
 import com.chesspredictor.domain.entities.PopularMove
 import com.chesspredictor.domain.utils.ChessConstants
 
@@ -227,59 +223,5 @@ class OpeningDetector {
     
     private fun normalizeMove(move: String): String {
         return move.replace(Regex("[+#!?]"), "").trim()
-    }
-    
-    fun getAllOpenings(): List<ChessOpening> = openingDatabase
-    
-    fun getOpeningsByCategory(category: OpeningCategory): List<ChessOpening> {
-        return openingDatabase.filter { it.category == category }
-            .sortedByDescending { it.popularity }
-    }
-    
-    fun getOpeningsByDifficulty(difficulty: OpeningDifficulty): List<ChessOpening> {
-        return openingDatabase.filter { it.difficulty == difficulty }
-            .sortedByDescending { it.popularity }
-    }
-    
-    fun getPopularOpenings(limit: Int = 10): List<ChessOpening> {
-        return openingDatabase.sortedByDescending { it.popularity }.take(limit)
-    }
-    
-    fun getTrendingOpenings(limit: Int = 10): List<ChessOpening> {
-        return openingDatabase.filter { it.statistics.recentTrend > 0 }
-            .sortedByDescending { it.statistics.recentTrend }
-            .take(limit)
-    }
-    
-    fun getOpeningsByTheme(theme: OpeningTheme): List<ChessOpening> {
-        return openingDatabase.filter { theme in it.themes }
-            .sortedByDescending { it.popularity }
-    }
-    
-    fun searchOpenings(query: String): List<ChessOpening> {
-        val lowerQuery = query.lowercase()
-        return openingDatabase.filter { 
-            it.name.lowercase().contains(lowerQuery) ||
-            it.eco.lowercase().contains(lowerQuery) ||
-            it.description.lowercase().contains(lowerQuery)
-        }.sortedByDescending { it.popularity }
-    }
-    
-    fun getOpeningStatistics(eco: String): OpeningStatistics? {
-        return openingDatabase.find { it.eco == eco }?.statistics
-    }
-    
-    fun getVariationsOf(parentEco: String): List<ChessOpening> {
-        val variations = ecoHierarchy[parentEco] ?: emptyList()
-        return openingDatabase.filter { it.eco in variations }
-            .sortedByDescending { it.popularity }
-    }
-    
-    fun getParentOpening(childEco: String): ChessOpening? {
-        val parentEco = ecoHierarchy.entries.find { 
-            childEco in it.value 
-        }?.key ?: return null
-        
-        return openingDatabase.find { it.eco == parentEco }
     }
 }

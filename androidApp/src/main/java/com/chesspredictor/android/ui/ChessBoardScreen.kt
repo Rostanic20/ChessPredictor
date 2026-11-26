@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
@@ -30,10 +28,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.chesspredictor.android.ui.components.*
@@ -500,133 +496,6 @@ private fun PortraitLayout(
 }
 
 
-@Composable
-fun EngineEvaluationDisplay(
-    evaluation: EngineEvaluation?,
-    depth: Int = 0,
-    nodes: Long = 0
-) {
-    if (evaluation == null) return
-    
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Engine Analysis",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                val displayText = when {
-                    evaluation.mate != null -> {
-                        val mate = evaluation.mate!!
-                        if (mate > 0) "M$mate" else "M${-mate}"
-                    }
-                    else -> {
-                        val score = evaluation.score
-                        when {
-                            score > 0 -> "+%.2f".format(score)
-                            score < 0 -> "%.2f".format(score)
-                            else -> "0.00"
-                        }
-                    }
-                }
-                
-                val scoreColor = when {
-                    evaluation.mate != null -> {
-                        if (evaluation.mate!! > 0) Color(0xFF4CAF50)
-                        else Color(0xFFF44336)
-                    }
-                    else -> {
-                        when {
-                            evaluation.score > 1.5 -> Color(0xFF4CAF50)
-                            evaluation.score > 0.5 -> Color(0xFF8BC34A)
-                            evaluation.score < -1.5 -> Color(0xFFF44336)
-                            evaluation.score < -0.5 -> Color(0xFFFF9800)
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    }
-                }
-                
-                Text(
-                    displayText,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = scoreColor
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(24.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black)
-            ) {
-                val whitePercentage = when {
-                    evaluation.mate != null -> {
-                        if (evaluation.mate!! > 0) 100f else 0f
-                    }
-                    else -> {
-                        val normalized = (evaluation.score.toFloat() + 10f) / 20f
-                        (normalized * 100).coerceIn(0f, 100f)
-                    }
-                }
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(whitePercentage.toFloat() / 100f)
-                        .fillMaxHeight()
-                        .background(Color.White)
-                )
-            }
-            
-            if (depth > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "Depth: $depth",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        "Nodes: ${formatNodes(nodes)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayModeSelector(
@@ -849,42 +718,6 @@ fun DifficultySettings(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-private fun formatNodes(nodes: Long): String {
-    return when {
-        nodes >= 1_000_000 -> "${nodes / 1_000_000}M"
-        nodes >= 1_000 -> "${nodes / 1_000}K"
-        else -> "$nodes"
-    }
-}
-
-@Composable
-fun ChessBoardScreenWithAnalysis(
-    viewModel: ChessBoardViewModel,
-    onNavigateToAnalysis: () -> Unit
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    
-    Box(modifier = Modifier.fillMaxSize()) {
-        ChessBoardScreen(viewModel = viewModel)
-        
-        if (uiState.moveHistory.isNotEmpty()) {
-            FloatingActionButton(
-                onClick = onNavigateToAnalysis,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    Icons.Default.Info,
-                    contentDescription = "View Analysis",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
             }
         }
     }

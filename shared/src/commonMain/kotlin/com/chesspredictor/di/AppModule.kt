@@ -5,7 +5,6 @@ import com.chesspredictor.data.datasources.StockfishDataSource
 import com.chesspredictor.data.repositories.ChessEngineRepositoryImpl
 import com.chesspredictor.data.utils.MoveParserImpl
 import com.chesspredictor.domain.repositories.ChessEngineRepository
-import com.chesspredictor.domain.usecases.GetBestMoveUseCase
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -18,11 +17,7 @@ class AppModule {
     val chessEngineRepository: ChessEngineRepository by lazy {
         ChessEngineRepositoryImpl(stockfishDataSource as ChessEngineDataSource, moveParser)
     }
-    
-    val getBestMoveUseCase by lazy {
-        GetBestMoveUseCase(chessEngineRepository)
-    }
-    
+
     suspend fun initializeEngine() {
         engineInitMutex.withLock {
             if (engineInitialized) return
