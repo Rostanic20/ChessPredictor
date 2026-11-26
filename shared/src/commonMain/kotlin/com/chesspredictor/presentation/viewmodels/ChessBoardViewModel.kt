@@ -7,6 +7,8 @@ import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.EmotionalState
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.ExportFormat
+import com.chesspredictor.domain.entities.GameEnding
+import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.MoveCommentary
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.Square
@@ -20,6 +22,7 @@ import com.chesspredictor.presentation.managers.AnimationController
 import com.chesspredictor.presentation.managers.AnimationManager
 import com.chesspredictor.presentation.managers.EngineError
 import com.chesspredictor.presentation.managers.EngineManager
+import com.chesspredictor.presentation.managers.GameClock
 import com.chesspredictor.presentation.managers.GameStateManager
 import com.chesspredictor.presentation.managers.HumanBehaviorManager
 import com.chesspredictor.presentation.managers.MoveController
@@ -29,7 +32,6 @@ import com.chesspredictor.presentation.managers.PlayerColor
 import com.chesspredictor.presentation.managers.SettingsManager
 import com.chesspredictor.presentation.ErrorStateManager
 import com.chesspredictor.presentation.ChessError
-import com.chesspredictor.utils.TimeProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,11 +64,11 @@ class ChessBoardViewModel(
     private val animationController = AnimationController(animationManager)
     private val settingsManager = SettingsManager()
     private val moveController = MoveController(chessRulesEngine, gameStateManager, animationController)
-    private val persistence = gameStateRepository?.let { GamePersistence(it, settingsManager, moveController) }
+    private val clock = GameClock(viewModelScope) { color -> onTimeout(color) }
+    private val persistence = gameStateRepository?.let { GamePersistence(it, settingsManager, moveController, clock) }
 
     private val _isInitializing = MutableStateFlow(true)
     private val _currentOpening = MutableStateFlow<OpeningInfo?>(null)
-    private var moveStartTime = 0L
     private var pendingMoveJob: Job? = null
     private var openingJob: Job? = null
 
@@ -79,11 +81,11 @@ class ChessBoardViewModel(
     val lastCommentary: StateFlow<MoveCommentary?> = humanBehaviorManager.lastCommentary
     val isShowingThoughts: StateFlow<Boolean> = humanBehaviorManager.isShowingThoughts
     val errorState: StateFlow<ChessError?> = errorManager.currentError
-    val currentTimeControl: StateFlow<TimeControl> = settingsManager.currentTimeControl
-    val playerTimeRemaining: StateFlow<Map<ChessColor, Long>> = settingsManager.playerTimeRemaining
+    val currentTimeControl: StateFlow<TimeControl?> = clock.timeControl
+    val playerTimeRemaining: StateFlow<Map<ChessColor, Long>> = clock.remaining
 
     val uiState: StateFlow<ChessBoardUiState> =
-        chessBoardUiState(gameStateManager, moveController, animationController, settingsManager).stateIn(
+        chessBoardUiState(gameStateManager, moveController, animationController, settingsManager, clock).stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(ChessConstants.FLOW_SUBSCRIPTION_TIMEOUT_MS),
             initialValue = ChessBoardUiState()
@@ -171,17 +173,43 @@ class ChessBoardViewModel(
         pendingMoveJob?.cancel()
         pendingMoveJob = null
         animationController.clearAnimations()
+        clock.stop()
+    }
+
+    private fun restartClock() {
+        if (gameStateManager.isGameOver()) {
+            clock.stop()
+        } else {
+            clock.startTurn(gameStateManager.currentTurn.value, counting = gameStateManager.moveHistory.value.isNotEmpty())
+        }
     }
 
     private fun resetToNewGame() {
         cancelPendingWork()
         gameStateManager.reset()
         moveController.clearSelection()
-        settingsManager.resetPlayerTimes()
-        moveStartTime = 0L
+        clock.reset()
+        restartClock()
         refreshOpening(emptyList())
 
         viewModelScope.launch { ensureEngineReadyAndMaybeMove() }
+    }
+
+    private fun onTimeout(color: ChessColor) {
+        if (gameStateManager.isGameOver()) return
+        engineManager.cancelPendingMove()
+        engineManager.clearDrawOffer()
+        moveController.clearSelection()
+        val ending = GameEnding.outOfTime(color)
+        val gameState = gameStateManager.currentGameState
+        gameStateManager.endGame(ending, isDraw = gameState != null && endingIsDraw(ending, gameState))
+        saveGameState()
+    }
+
+    private fun endingIsDraw(ending: GameEnding, gameState: GameState): Boolean = when (ending) {
+        GameEnding.DRAW_AGREED -> true
+        GameEnding.WHITE_OUT_OF_TIME -> !chessRulesEngine.hasMatingMaterial(gameState, ChessColor.BLACK)
+        GameEnding.BLACK_OUT_OF_TIME -> !chessRulesEngine.hasMatingMaterial(gameState, ChessColor.WHITE)
     }
 
     fun onSquareClick(square: Square) {
@@ -198,7 +226,6 @@ class ChessBoardViewModel(
                 val piece = boardState[square]
                 if (piece != null && piece.color == currentTurn) {
                     moveController.selectSquare(square, currentTurn, boardState)
-                    moveStartTime = TimeProvider.currentTimeMillis()
                 }
             }
             selectedSquare == square -> {
@@ -211,10 +238,8 @@ class ChessBoardViewModel(
                 val piece = boardState[square]
                 if (piece != null && canSelectPiece(piece, currentTurn)) {
                     moveController.selectSquare(square, currentTurn, boardState)
-                    if (moveStartTime == 0L) moveStartTime = TimeProvider.currentTimeMillis()
                 } else {
                     moveController.clearSelection()
-                    moveStartTime = 0L
                 }
             }
         }
@@ -238,12 +263,9 @@ class ChessBoardViewModel(
     }
 
     private fun executeMove(from: Square, to: Square, promotionPiece: ChessPiece? = null) {
-        val timeSpent = if (moveStartTime > 0) TimeProvider.currentTimeMillis() - moveStartTime else ChessConstants.DEFAULT_MOVE_TIME_MS
-        moveStartTime = 0L
-
         val result = moveController.makeMove(from, to, promotionPiece) ?: return
+        val timeSpent = clock.completeTurn()
 
-        updatePlayerTime(result.oldGameState.turn, timeSpent)
         animationController.startMoveAnimation(result.move, result.oldGameState, result.newGameState, settingsManager.isFlipped.value)
 
         pendingMoveJob = viewModelScope.launch {
@@ -260,6 +282,7 @@ class ChessBoardViewModel(
         gameStateManager.updateFromGameState(finalState)
         gameStateManager.setLastMove(result.move)
         animationController.clearAnimations()
+        restartClock()
 
         refreshOpening(finalState.moveHistory)
 
@@ -272,18 +295,10 @@ class ChessBoardViewModel(
 
     private fun enhanceMoveHistory(history: List<DetailedMove>, timeSpent: Long): List<DetailedMove> {
         val lastMove = history.lastOrNull() ?: return history
-        val timeRemaining = settingsManager.playerTimeRemaining.value[
-            if (lastMove.isWhiteMove) ChessColor.WHITE else ChessColor.BLACK
-        ] ?: 0L
+        val mover = if (lastMove.isWhiteMove) ChessColor.WHITE else ChessColor.BLACK
+        val timeRemaining = clock.remaining.value[mover]?.takeIf { clock.timeControl.value != null }
         val enhanced = lastMove.copy(timeSpent = timeSpent, remainingTime = timeRemaining)
         return history.dropLast(1) + enhanced
-    }
-
-    private fun updatePlayerTime(color: ChessColor, timeSpent: Long) {
-        val current = settingsManager.playerTimeRemaining.value[color] ?: return
-        val increment = settingsManager.currentTimeControl.value.increment
-        val newTime = (current - timeSpent + increment).coerceAtLeast(0)
-        settingsManager.updatePlayerTime(color, newTime)
     }
 
     private fun getEngineMove() {
@@ -303,11 +318,15 @@ class ChessBoardViewModel(
     }
 
     private fun requestEngineMoveInternal() {
-        moveStartTime = TimeProvider.currentTimeMillis()
         val board = gameStateManager.board.value
+        val budget = clock.budgetFor(board.turn)
+        val settings = settingsManager.engineSettings.value.let { settings ->
+            if (budget == null) settings else settings.copy(timeLimit = settings.timeLimit.coerceAtMost(budget.toInt()))
+        }
         engineManager.requestEngineMove(
             board = board,
-            settings = settingsManager.engineSettings.value
+            settings = settings,
+            maxThinkMs = budget
         ) { move ->
             if (gameStateManager.board.value.fen != board.fen) return@requestEngineMove
             executeMove(move.from, move.to, move.promotion)
@@ -316,11 +335,15 @@ class ChessBoardViewModel(
 
     fun undoLastMove() {
         if (_isInitializing.value) return
+        val ending = gameStateManager.gameStatus.value.ending
+        if (ending != null && ending != GameEnding.DRAW_AGREED) return
         if (!moveController.undoLastMove()) return
+        clock.completeTurn(withIncrement = false)
         engineManager.cancelPendingMove()
         while (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
             if (!moveController.undoLastMove()) break
         }
+        restartClock()
         refreshOpening(gameStateManager.moveHistory.value)
         saveGameState()
         if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
@@ -350,7 +373,11 @@ class ChessBoardViewModel(
 
     fun acceptDrawOffer() {
         engineManager.clearDrawOffer()
-        gameStateManager.setGameStatus(gameStateManager.gameStatus.value.copy(isDraw = true))
+        if (gameStateManager.isGameOver()) return
+        engineManager.cancelPendingMove()
+        gameStateManager.endGame(GameEnding.DRAW_AGREED, isDraw = true)
+        clock.stop()
+        saveGameState()
     }
 
     fun declineDrawOffer() = engineManager.clearDrawOffer()
@@ -377,14 +404,22 @@ class ChessBoardViewModel(
         settingsManager.setEngineSettings(settings.withDifficulty(settings.difficulty))
     }
 
-    fun setTimeControl(timeControl: TimeControl) = settingsManager.setTimeControl(timeControl)
+    fun setTimeControl(timeControl: TimeControl?) {
+        clock.setTimeControl(timeControl)
+        restartClock()
+        saveGameState()
+    }
+
+    fun pauseClock() = clock.pause()
+
+    fun resumeClock() = clock.resume()
 
     fun saveGameState() {
         val persistence = persistence ?: return
         viewModelScope.launch {
             try {
                 val gameState = gameStateManager.currentGameState ?: return@launch
-                persistence.save(gameState)
+                persistence.save(gameState, gameStateManager.gameStatus.value.ending)
             } catch (e: Exception) {
                 errorManager.reportError(ChessError.SaveGameError(
                     message = "Could not save game: ${e.message}"
@@ -396,11 +431,15 @@ class ChessBoardViewModel(
     suspend fun loadSavedGame() {
         val persistence = persistence ?: return resetToNewGame()
         try {
-            val gameState = persistence.load() ?: return
+            val (gameState, ending) = persistence.load() ?: return
 
             cancelPendingWork()
             gameStateManager.updateFromGameState(gameState)
             gameStateManager.setLastMove(gameState.moveHistory.lastOrNull()?.move)
+            if (ending != null && !gameStateManager.isGameOver()) {
+                gameStateManager.endGame(ending, endingIsDraw(ending, gameState))
+            }
+            restartClock()
             refreshOpening(gameState.moveHistory)
             moveController.clearSelection()
 
@@ -415,7 +454,8 @@ class ChessBoardViewModel(
 
     fun exportGame(format: ExportFormat): String {
         val gameState = gameStateManager.currentGameState ?: return ""
-        return importExportGameUseCase.exportGame(gameState, format, settingsManager.exportMetadata(_currentOpening.value))
+        val metadata = settingsManager.exportMetadata(_currentOpening.value, clock.timeControl.value, gameStateManager.gameStatus.value)
+        return importExportGameUseCase.exportGame(gameState, format, metadata)
     }
 
     fun importGame(content: String, format: ExportFormat) {
@@ -427,6 +467,8 @@ class ChessBoardViewModel(
                     gameStateManager.setLastMove(importedData.gameState.moveHistory.lastOrNull()?.move)
                     moveController.clearSelection()
                     importedData.additionalData?.let(settingsManager::applyImportedSettings)
+                    clock.reset()
+                    restartClock()
 
                     refreshOpening(importedData.gameState.moveHistory)
                     saveGameState()

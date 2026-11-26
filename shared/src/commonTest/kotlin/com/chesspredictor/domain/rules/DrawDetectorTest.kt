@@ -14,6 +14,13 @@ class DrawDetectorTest {
     private val drawDetector = DrawDetector()
 
     @Test
+    fun aLoneKingCannotWinOnTimeButAPawnCan() {
+        val state = fenParser.parseGameState("8/8/8/3k4/8/8/4P3/4K3 b - - 0 1")
+        assertFalse(drawDetector.hasMatingMaterial(state, ChessColor.BLACK))
+        assertTrue(drawDetector.hasMatingMaterial(state, ChessColor.WHITE))
+    }
+
+    @Test
     fun testKingVsKingInsufficientMaterial() {
         val state = fenParser.parseGameState("8/8/8/3k4/8/8/8/4K3 w - - 0 1")
         assertTrue(drawDetector.isInsufficientMaterial(state))

@@ -84,6 +84,10 @@ class ChessRulesEngine {
     fun isDraw(gameState: GameState): Boolean {
         return drawDetector.isDraw(gameState)
     }
+
+    fun hasMatingMaterial(gameState: GameState, color: ChessColor): Boolean {
+        return drawDetector.hasMatingMaterial(gameState, color)
+    }
     
     fun isInsufficientMaterial(board: Map<Square, ChessPiece>): Boolean {
         val gameState = GameState(

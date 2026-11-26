@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.chesspredictor.data.repositories.GameStateRepository
 import com.chesspredictor.data.repositories.SavedGameCodec
 import com.chesspredictor.data.repositories.SavedGameState
+import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.EngineSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -39,6 +40,10 @@ class GameStateRepositoryImpl(
         private val IS_FLIPPED_KEY = booleanPreferencesKey("is_flipped")
         private val SHOW_COORDINATES_KEY = booleanPreferencesKey("show_coordinates")
         private val TIMESTAMP_KEY = longPreferencesKey("timestamp")
+        private val TIME_CONTROL_KEY = stringPreferencesKey("time_control")
+        private val WHITE_TIME_KEY = longPreferencesKey("white_time_ms")
+        private val BLACK_TIME_KEY = longPreferencesKey("black_time_ms")
+        private val ENDING_KEY = stringPreferencesKey("ending")
     }
 
     override suspend fun saveGameState(gameState: SavedGameState) {
@@ -54,6 +59,14 @@ class GameStateRepositoryImpl(
             preferences[IS_FLIPPED_KEY] = gameState.isFlipped
             preferences[SHOW_COORDINATES_KEY] = gameState.showCoordinates
             preferences[TIMESTAMP_KEY] = gameState.timestamp
+            val timeControl = gameState.timeControl
+            if (timeControl != null) preferences[TIME_CONTROL_KEY] = SavedGameCodec.encodeTimeControl(timeControl) else preferences.remove(TIME_CONTROL_KEY)
+            val white = gameState.remainingTimes?.get(ChessColor.WHITE)
+            if (white != null) preferences[WHITE_TIME_KEY] = white else preferences.remove(WHITE_TIME_KEY)
+            val black = gameState.remainingTimes?.get(ChessColor.BLACK)
+            if (black != null) preferences[BLACK_TIME_KEY] = black else preferences.remove(BLACK_TIME_KEY)
+            val ending = gameState.ending
+            if (ending != null) preferences[ENDING_KEY] = ending.name else preferences.remove(ENDING_KEY)
         }
     }
 
@@ -91,7 +104,10 @@ class GameStateRepositoryImpl(
             } ?: EngineSettings(),
             isFlipped = preferences[IS_FLIPPED_KEY] ?: false,
             showCoordinates = preferences[SHOW_COORDINATES_KEY] ?: true,
-            timestamp = preferences[TIMESTAMP_KEY] ?: 0L
+            timestamp = preferences[TIMESTAMP_KEY] ?: 0L,
+            timeControl = SavedGameCodec.decodeTimeControl(preferences[TIME_CONTROL_KEY]),
+            remainingTimes = SavedGameCodec.remainingTimes(preferences[WHITE_TIME_KEY], preferences[BLACK_TIME_KEY]),
+            ending = SavedGameCodec.decodeEnding(preferences[ENDING_KEY])
         )
     }
 }

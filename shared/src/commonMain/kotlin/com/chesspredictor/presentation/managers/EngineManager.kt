@@ -96,6 +96,7 @@ class EngineManager(
     fun requestEngineMove(
         board: ChessBoard,
         settings: EngineSettings,
+        maxThinkMs: Long? = null,
         onMoveReady: (ChessMove) -> Unit
     ) {
         moveJob?.cancel()
@@ -128,7 +129,7 @@ class EngineManager(
                         board,
                         settings.timeLimit.toLong(),
                         timeControl
-                    ).toInt()
+                    ).coerceAtMost(maxThinkMs ?: Long.MAX_VALUE).toInt()
 
                     humanBehaviorManager.simulateThinkingProcess(settings.behaviorProfile, humanThinkingTime.toLong())
 

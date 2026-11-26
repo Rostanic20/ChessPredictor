@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
+import com.chesspredictor.domain.entities.GameEnding
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.presentation.viewmodels.ChessBoardUiState
 
@@ -263,6 +264,24 @@ fun NewGameConfirmationDialog(
     )
 }
 
+private fun gameOverText(uiState: ChessBoardUiState): String {
+    val ending = uiState.ending
+    val flagged = when (ending) {
+        GameEnding.WHITE_OUT_OF_TIME -> "White"
+        GameEnding.BLACK_OUT_OF_TIME -> "Black"
+        else -> null
+    }
+    val opponent = if (flagged == "White") "Black" else "White"
+    return when {
+        ending == GameEnding.DRAW_AGREED -> "DRAW! Agreed by both sides."
+        flagged != null && uiState.isDraw -> "$flagged ran out of time. Draw: $opponent cannot checkmate."
+        flagged != null -> "$flagged ran out of time. $opponent wins!"
+        uiState.isCheckmate -> "CHECKMATE! ${if (uiState.currentTurn == ChessColor.WHITE) "Black" else "White"} wins!"
+        uiState.isStalemate -> "STALEMATE! Game is a draw."
+        else -> "DRAW! Game ended in a draw."
+    }
+}
+
 @Composable
 fun GameStatusCard(
     uiState: ChessBoardUiState,
@@ -270,23 +289,19 @@ fun GameStatusCard(
     isEngineReady: Boolean,
     modifier: Modifier = Modifier
 ) {
-    if (uiState.isCheckmate || uiState.isStalemate || uiState.isDraw) {
+    if (uiState.isGameOver) {
         Card(
             modifier = modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = when {
-                    uiState.isCheckmate -> MaterialTheme.colorScheme.errorContainer
-                    else -> MaterialTheme.colorScheme.secondaryContainer
+                    uiState.isDraw || uiState.isStalemate -> MaterialTheme.colorScheme.secondaryContainer
+                    else -> MaterialTheme.colorScheme.errorContainer
                 }
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = when {
-                    uiState.isCheckmate -> "CHECKMATE! ${if (uiState.currentTurn == ChessColor.WHITE) "Black" else "White"} wins!"
-                    uiState.isStalemate -> "STALEMATE! Game is a draw."
-                    else -> "DRAW! Game ended in a draw."
-                },
+                text = gameOverText(uiState),
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,

@@ -7,9 +7,12 @@ import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.EngineSettings
+import com.chesspredictor.domain.entities.GameEnding
 import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.entities.TimeControl
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.presentation.managers.AnimationController
+import com.chesspredictor.presentation.managers.GameClock
 import com.chesspredictor.presentation.managers.GameStateManager
 import com.chesspredictor.presentation.managers.GameStatus
 import com.chesspredictor.presentation.managers.MoveController
@@ -45,14 +48,19 @@ data class ChessBoardUiState(
     val showNewGameDialog: Boolean = false,
     val animations: List<PieceAnimation> = emptyList(),
     val isAnimating: Boolean = false,
-    val animatingPieces: Set<Square> = emptySet()
-)
+    val animatingPieces: Set<Square> = emptySet(),
+    val ending: GameEnding? = null,
+    val timeControl: TimeControl? = null
+) {
+    val isGameOver: Boolean get() = isCheckmate || isStalemate || isDraw || ending != null
+}
 
 internal fun chessBoardUiState(
     gameStateManager: GameStateManager,
     moveController: MoveController,
     animationController: AnimationController,
-    settingsManager: SettingsManager
+    settingsManager: SettingsManager,
+    clock: GameClock
 ): Flow<ChessBoardUiState> = combine(
     combine(
         gameStateManager.board,
@@ -88,9 +96,10 @@ internal fun chessBoardUiState(
     combine(
         settingsManager.playerColor,
         settingsManager.engineSettings,
-        animationController.animatingPieces
-    ) { color, engine, animPieces ->
-        SettingsData(color, engine, animPieces)
+        animationController.animatingPieces,
+        clock.timeControl
+    ) { color, engine, animPieces, timeControl ->
+        SettingsData(color, engine, animPieces, timeControl)
     }
 ) { game, status, interaction, prefs, settings ->
     ChessBoardUiState(
@@ -114,7 +123,9 @@ internal fun chessBoardUiState(
         engineSettings = settings.engine,
         animations = interaction.anims,
         isAnimating = interaction.animating,
-        animatingPieces = settings.animPieces
+        animatingPieces = settings.animPieces,
+        ending = status.status.ending,
+        timeControl = settings.timeControl
     )
 }
 
@@ -148,5 +159,6 @@ private data class PrefsData(
 private data class SettingsData(
     val color: PlayerColor,
     val engine: EngineSettings,
-    val animPieces: Set<Square>
+    val animPieces: Set<Square>,
+    val timeControl: TimeControl?
 )

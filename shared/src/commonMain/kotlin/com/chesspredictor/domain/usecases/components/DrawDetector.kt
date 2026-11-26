@@ -1,5 +1,6 @@
 package com.chesspredictor.domain.usecases.components
 
+import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
@@ -35,6 +36,10 @@ class DrawDetector {
         if (minors.size <= 1) return true
         if (minors.values.any { it is ChessPiece.Knight }) return false
         return minors.keys.map(::isLightSquare).distinct().size == 1
+    }
+
+    fun hasMatingMaterial(gameState: GameState, color: ChessColor): Boolean {
+        return gameState.board.values.any { it.color == color && it !is ChessPiece.King }
     }
 
     private fun isLightSquare(square: Square): Boolean {

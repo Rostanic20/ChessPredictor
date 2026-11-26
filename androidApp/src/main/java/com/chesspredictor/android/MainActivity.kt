@@ -59,12 +59,10 @@ fun ChessApp() {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    coroutineScope.launch {
-                        viewModel.saveGameState()
-                    }
+                    viewModel.pauseClock()
+                    viewModel.saveGameState()
                 }
-                Lifecycle.Event.ON_RESUME -> {
-                }
+                Lifecycle.Event.ON_RESUME -> viewModel.resumeClock()
                 else -> {}
             }
         }

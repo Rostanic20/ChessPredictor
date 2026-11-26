@@ -72,7 +72,7 @@ class ImportExportGameUseCase(
         pgn.appendLine("[Round \"${additionalData?.round ?: "-"}\"]")
         pgn.appendLine("[White \"${additionalData?.white ?: "Player"}\"]")
         pgn.appendLine("[Black \"${additionalData?.black ?: "Engine"}\"]")
-        pgn.appendLine("[Result \"${getGameResult(gameState)}\"]")
+        pgn.appendLine("[Result \"${getGameResult(gameState, additionalData)}\"]")
         
         val startFen = gameState.startingFen()
         if (startFen != ChessConstants.STARTING_POSITION_FEN) {
@@ -117,7 +117,7 @@ class ImportExportGameUseCase(
             pgn.append(" ")
         }
         
-        pgn.append(getGameResult(gameState))
+        pgn.append(getGameResult(gameState, additionalData))
         
         return pgn.toString().trim()
     }
@@ -146,7 +146,7 @@ class ImportExportGameUseCase(
             round = additionalData?.round ?: "-",
             white = additionalData?.white ?: "Player",
             black = additionalData?.black ?: "Engine",
-            result = getGameResult(gameState),
+            result = getGameResult(gameState, additionalData),
             fen = gameState.toFen(),
             moves = exportedMoves,
             currentPly = gameState.fullMoveNumber * 2 - (if (gameState.turn == ChessColor.WHITE) 2 else 1),
@@ -349,7 +349,8 @@ class ImportExportGameUseCase(
 
     private fun normalizeSan(san: String): String = san.trimEnd('+', '#')
 
-    private fun getGameResult(gameState: GameState): String {
+    private fun getGameResult(gameState: GameState, additionalData: ExportAdditionalData?): String {
+        additionalData?.result?.let { return it }
         return when {
             gameState.isCheckmate -> {
                 if (gameState.turn == ChessColor.WHITE) "0-1" else "1-0"
@@ -399,7 +400,8 @@ data class ExportAdditionalData(
     val playMode: String? = null,
     val playerColor: String? = null,
     val engineDifficulty: String? = null,
-    val moveComments: Map<Int, String>? = null
+    val moveComments: Map<Int, String>? = null,
+    val result: String? = null
 )
 
 data class ImportedGameData(

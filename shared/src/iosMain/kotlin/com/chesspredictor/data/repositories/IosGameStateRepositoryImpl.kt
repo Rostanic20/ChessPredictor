@@ -1,5 +1,6 @@
 package com.chesspredictor.data.repositories
 
+import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.EngineSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,10 @@ class IosGameStateRepositoryImpl : GameStateRepository {
         private const val KEY_IS_FLIPPED = "chess_is_flipped"
         private const val KEY_SHOW_COORDINATES = "chess_show_coordinates"
         private const val KEY_TIMESTAMP = "chess_timestamp"
+        private const val KEY_TIME_CONTROL = "chess_time_control"
+        private const val KEY_WHITE_TIME = "chess_white_time_ms"
+        private const val KEY_BLACK_TIME = "chess_black_time_ms"
+        private const val KEY_ENDING = "chess_ending"
     }
 
     override suspend fun saveGameState(gameState: SavedGameState) {
@@ -42,6 +47,18 @@ class IosGameStateRepositoryImpl : GameStateRepository {
         defaults.setBool(gameState.isFlipped, KEY_IS_FLIPPED)
         defaults.setBool(gameState.showCoordinates, KEY_SHOW_COORDINATES)
         defaults.setDouble(gameState.timestamp.toDouble(), KEY_TIMESTAMP)
+        val timeControl = gameState.timeControl
+        if (timeControl != null) defaults.setObject(SavedGameCodec.encodeTimeControl(timeControl), KEY_TIME_CONTROL) else defaults.removeObjectForKey(KEY_TIME_CONTROL)
+        val times = gameState.remainingTimes
+        if (times != null) {
+            defaults.setDouble(times.getValue(ChessColor.WHITE).toDouble(), KEY_WHITE_TIME)
+            defaults.setDouble(times.getValue(ChessColor.BLACK).toDouble(), KEY_BLACK_TIME)
+        } else {
+            defaults.removeObjectForKey(KEY_WHITE_TIME)
+            defaults.removeObjectForKey(KEY_BLACK_TIME)
+        }
+        val ending = gameState.ending
+        if (ending != null) defaults.setObject(ending.name, KEY_ENDING) else defaults.removeObjectForKey(KEY_ENDING)
         defaults.synchronize()
         _gameStateFlow.value = gameState
     }
@@ -60,7 +77,13 @@ class IosGameStateRepositoryImpl : GameStateRepository {
             } ?: EngineSettings(),
             isFlipped = defaults.boolForKey(KEY_IS_FLIPPED),
             showCoordinates = if (defaults.objectForKey(KEY_SHOW_COORDINATES) != null) defaults.boolForKey(KEY_SHOW_COORDINATES) else true,
-            timestamp = defaults.doubleForKey(KEY_TIMESTAMP).toLong()
+            timestamp = defaults.doubleForKey(KEY_TIMESTAMP).toLong(),
+            timeControl = SavedGameCodec.decodeTimeControl(defaults.stringForKey(KEY_TIME_CONTROL)),
+            remainingTimes = SavedGameCodec.remainingTimes(
+                defaults.objectForKey(KEY_WHITE_TIME)?.let { defaults.doubleForKey(KEY_WHITE_TIME).toLong() },
+                defaults.objectForKey(KEY_BLACK_TIME)?.let { defaults.doubleForKey(KEY_BLACK_TIME).toLong() }
+            ),
+            ending = SavedGameCodec.decodeEnding(defaults.stringForKey(KEY_ENDING))
         )
         _gameStateFlow.value = state
         return state
@@ -69,7 +92,8 @@ class IosGameStateRepositoryImpl : GameStateRepository {
     override suspend fun clearGameState() {
         listOf(KEY_FEN, KEY_START_FEN, KEY_MOVE_HISTORY, KEY_CAPTURED_PIECES, KEY_PLAY_MODE,
             KEY_PLAYER_COLOR, KEY_ENGINE_SETTINGS, KEY_IS_FLIPPED,
-            KEY_SHOW_COORDINATES, KEY_TIMESTAMP).forEach {
+            KEY_SHOW_COORDINATES, KEY_TIMESTAMP, KEY_TIME_CONTROL, KEY_WHITE_TIME,
+            KEY_BLACK_TIME, KEY_ENDING).forEach {
             defaults.removeObjectForKey(it)
         }
         defaults.synchronize()

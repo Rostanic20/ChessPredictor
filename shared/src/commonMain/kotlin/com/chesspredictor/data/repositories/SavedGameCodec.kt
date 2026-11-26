@@ -4,9 +4,27 @@ import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
+import com.chesspredictor.domain.entities.GameEnding
 import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.entities.TimeControl
 
 object SavedGameCodec {
+
+    fun encodeTimeControl(timeControl: TimeControl): String = "${timeControl.initialTime}+${timeControl.increment}"
+
+    fun decodeTimeControl(serialized: String?): TimeControl? {
+        val parts = serialized?.split("+")?.takeIf { it.size == 2 } ?: return null
+        val initial = parts[0].toLongOrNull()?.takeIf { it > 0 } ?: return null
+        val increment = parts[1].toLongOrNull()?.takeIf { it >= 0 } ?: return null
+        return TimeControl.of(initial, increment)
+    }
+
+    fun decodeEnding(serialized: String?): GameEnding? = GameEnding.entries.find { it.name == serialized }
+
+    fun remainingTimes(whiteMs: Long?, blackMs: Long?): Map<ChessColor, Long>? {
+        if (whiteMs == null || blackMs == null || whiteMs < 0 || blackMs < 0) return null
+        return mapOf(ChessColor.WHITE to whiteMs, ChessColor.BLACK to blackMs)
+    }
 
     fun encodeMoves(moves: List<DetailedMove>): String = moves.joinToString(";") { detailed ->
         val move = detailed.move

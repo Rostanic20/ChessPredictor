@@ -37,6 +37,14 @@ class ImportExportGameUseCaseTest {
     }
 
     @Test
+    fun exportUsesAnAdjudicatedResultWhenGiven() {
+        val game = play(startPosition(), "e2e4", "e7e5")
+        val pgn = useCase.exportGame(game, ExportFormat.PGN, ExportAdditionalData(result = "1/2-1/2"))
+        assertTrue(pgn.contains("[Result \"1/2-1/2\"]"), pgn)
+        assertTrue(pgn.endsWith("1. e4 e5 1/2-1/2"), pgn)
+    }
+
+    @Test
     fun pgnRoundTripKeepsEveryMove() {
         val game = play(startPosition(), "e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6", "e1g1")
         val imported = importPgn(useCase.exportGame(game, ExportFormat.PGN))

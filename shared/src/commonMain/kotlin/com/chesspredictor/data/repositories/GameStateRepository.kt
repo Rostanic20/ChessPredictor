@@ -1,6 +1,9 @@
 package com.chesspredictor.data.repositories
 
+import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessPiece
+import com.chesspredictor.domain.entities.GameEnding
+import com.chesspredictor.domain.entities.TimeControl
 import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.utils.TimeProvider
@@ -24,5 +27,8 @@ data class SavedGameState(
     val showCoordinates: Boolean,
     val timestamp: Long = TimeProvider.currentTimeMillis(),
     val positionEvaluations: List<Float> = listOf(),
-    val startFen: String? = null
+    val startFen: String? = null,
+    val timeControl: TimeControl? = null,
+    val remainingTimes: Map<ChessColor, Long>? = null,
+    val ending: GameEnding? = null
 )

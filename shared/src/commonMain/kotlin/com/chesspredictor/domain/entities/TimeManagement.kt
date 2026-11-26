@@ -70,7 +70,30 @@ data class TimeControl(
     val initialTime: Long,
     val increment: Long,
     val type: TimeControlType
-)
+) {
+    val label: String get() = "${initialTime / 60_000}+${increment / 1000}"
+
+    companion object {
+        fun of(initialMs: Long, incrementMs: Long): TimeControl {
+            val estimatedMs = initialMs + 40 * incrementMs
+            val type = when {
+                estimatedMs < 180_000 -> TimeControlType.BULLET
+                estimatedMs < 480_000 -> TimeControlType.BLITZ
+                estimatedMs < 1_500_000 -> TimeControlType.RAPID
+                else -> TimeControlType.CLASSICAL
+            }
+            return TimeControl(initialMs, incrementMs, type)
+        }
+
+        val PRESETS: List<TimeControl> = listOf(
+            of(180_000, 2_000),
+            of(300_000, 0),
+            of(600_000, 0),
+            of(900_000, 10_000),
+            of(1_800_000, 0)
+        )
+    }
+}
 
 enum class TimeControlType {
     CLASSICAL,

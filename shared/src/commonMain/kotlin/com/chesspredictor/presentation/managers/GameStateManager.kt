@@ -6,6 +6,7 @@ import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.DetailedMove
+import com.chesspredictor.domain.entities.GameEnding
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.usecases.ChessRulesEngine
@@ -59,8 +60,8 @@ class GameStateManager(
         _lastMove.value = move
     }
 
-    fun setGameStatus(status: GameStatus) {
-        _gameStatus.value = status
+    fun endGame(ending: GameEnding, isDraw: Boolean) {
+        _gameStatus.value = _gameStatus.value.copy(ending = ending, isDraw = isDraw)
     }
 
     fun reset() {
@@ -82,7 +83,7 @@ class GameStateManager(
 
     fun isGameOver(): Boolean {
         val status = _gameStatus.value
-        return status.isCheckmate || status.isStalemate || status.isDraw
+        return status.isCheckmate || status.isStalemate || status.isDraw || status.ending != null
     }
 
     private fun updateGameStatus(gameState: GameState) {
@@ -124,5 +125,6 @@ data class GameStatus(
     val isCheck: Boolean = false,
     val isCheckmate: Boolean = false,
     val isStalemate: Boolean = false,
-    val isDraw: Boolean = false
+    val isDraw: Boolean = false,
+    val ending: GameEnding? = null
 )

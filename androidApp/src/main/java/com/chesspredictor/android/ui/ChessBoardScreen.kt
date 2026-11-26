@@ -112,18 +112,22 @@ fun ChessBoardScreen(
             isThinking = isThinking,
             isEngineReady = isEngineReady,
             currentOpening = currentOpening,
+            remainingTimes = viewModel.playerTimeRemaining,
             isLandscape = isLandscape,
-            onSquareClick = { square ->
-                val from = uiState.selectedSquare
-                if (from != null && viewModel.isPromotionMove(square)) {
-                    pendingPromotion = from to square
-                } else {
-                    viewModel.onSquareClick(square)
-                }
-            },
-            onPlayModeChange = viewModel::setPlayMode,
-            onPlayerColorChange = viewModel::setPlayerColor,
-            onEngineSettingsChange = viewModel::setEngineSettings
+            actions = GameActions(
+                onSquareClick = { square ->
+                    val from = uiState.selectedSquare
+                    if (from != null && viewModel.isPromotionMove(square)) {
+                        pendingPromotion = from to square
+                    } else {
+                        viewModel.onSquareClick(square)
+                    }
+                },
+                onPlayModeChange = viewModel::setPlayMode,
+                onPlayerColorChange = viewModel::setPlayerColor,
+                onEngineSettingsChange = viewModel::setEngineSettings,
+                onTimeControlChange = viewModel::setTimeControl
+            )
         )
     }
 }

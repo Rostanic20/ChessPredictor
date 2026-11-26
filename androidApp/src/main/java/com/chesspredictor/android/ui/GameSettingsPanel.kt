@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
+import com.chesspredictor.domain.entities.TimeControl
 import com.chesspredictor.presentation.managers.PlayMode
 import com.chesspredictor.presentation.managers.PlayerColor
 import com.chesspredictor.presentation.viewmodels.ChessBoardUiState
@@ -41,7 +43,8 @@ internal fun GameSettingsPanel(
     uiState: ChessBoardUiState,
     onPlayModeChange: (PlayMode) -> Unit,
     onPlayerColorChange: (PlayerColor) -> Unit,
-    onEngineSettingsChange: (EngineSettings) -> Unit
+    onEngineSettingsChange: (EngineSettings) -> Unit,
+    onTimeControlChange: (TimeControl?) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PlayModeSelector(
@@ -56,10 +59,62 @@ internal fun GameSettingsPanel(
             )
         }
 
+        TimeControlSelector(
+            current = uiState.timeControl,
+            onSelect = onTimeControlChange
+        )
+
         DifficultySettings(
             currentSettings = uiState.engineSettings,
             onSettingsChange = onEngineSettingsChange
         )
+    }
+}
+
+@Composable
+private fun TimeControlSelector(
+    current: TimeControl?,
+    onSelect: (TimeControl?) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Timer,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Clock",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            val options: List<TimeControl?> = listOf(null) + TimeControl.PRESETS
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                options.chunked(3).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        row.forEach { option ->
+                            FilterChip(
+                                selected = current == option,
+                                onClick = { onSelect(option) },
+                                label = { Text(option?.label ?: "No clock") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

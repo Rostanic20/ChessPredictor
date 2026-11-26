@@ -20,8 +20,6 @@ object ChessConstants {
         const val RETRY_DELAY_MS = 2000L
     }
 
-    const val DEFAULT_MOVE_TIME_MS = 5000L
-
     object PieceThresholds {
         const val ENDGAME = 14
         const val MIDDLEGAME = 12

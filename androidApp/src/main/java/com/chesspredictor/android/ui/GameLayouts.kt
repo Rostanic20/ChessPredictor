@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.chesspredictor.android.ui.components.CapturedPiecesDisplay
+import com.chesspredictor.android.ui.components.GameClocks
 import com.chesspredictor.android.ui.components.GameStatusCard
 import com.chesspredictor.android.ui.components.ModernChessBoard
 import com.chesspredictor.android.ui.components.MoveHistoryDisplay
@@ -20,9 +21,19 @@ import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.entities.TimeControl
 import com.chesspredictor.presentation.managers.PlayMode
 import com.chesspredictor.presentation.managers.PlayerColor
 import com.chesspredictor.presentation.viewmodels.ChessBoardUiState
+import kotlinx.coroutines.flow.StateFlow
+
+internal class GameActions(
+    val onSquareClick: (Square) -> Unit,
+    val onPlayModeChange: (PlayMode) -> Unit,
+    val onPlayerColorChange: (PlayerColor) -> Unit,
+    val onEngineSettingsChange: (EngineSettings) -> Unit,
+    val onTimeControlChange: (TimeControl?) -> Unit
+)
 
 @Composable
 internal fun ChessGameContent(
@@ -31,11 +42,9 @@ internal fun ChessGameContent(
     isThinking: Boolean,
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
+    remainingTimes: StateFlow<Map<ChessColor, Long>>,
     isLandscape: Boolean,
-    onSquareClick: (Square) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit,
-    onPlayerColorChange: (PlayerColor) -> Unit,
-    onEngineSettingsChange: (EngineSettings) -> Unit
+    actions: GameActions
 ) {
     Surface(
         modifier = Modifier
@@ -44,27 +53,9 @@ internal fun ChessGameContent(
         color = MaterialTheme.colorScheme.background
     ) {
         if (isLandscape) {
-            LandscapeLayout(
-                uiState = uiState,
-                isThinking = isThinking,
-                isEngineReady = isEngineReady,
-                currentOpening = currentOpening,
-                onSquareClick = onSquareClick,
-                onPlayModeChange = onPlayModeChange,
-                onPlayerColorChange = onPlayerColorChange,
-                onEngineSettingsChange = onEngineSettingsChange
-            )
+            LandscapeLayout(uiState, isThinking, isEngineReady, currentOpening, remainingTimes, actions)
         } else {
-            PortraitLayout(
-                uiState = uiState,
-                isThinking = isThinking,
-                isEngineReady = isEngineReady,
-                currentOpening = currentOpening,
-                onSquareClick = onSquareClick,
-                onPlayModeChange = onPlayModeChange,
-                onPlayerColorChange = onPlayerColorChange,
-                onEngineSettingsChange = onEngineSettingsChange
-            )
+            PortraitLayout(uiState, isThinking, isEngineReady, currentOpening, remainingTimes, actions)
         }
     }
 }
@@ -75,10 +66,8 @@ private fun LandscapeLayout(
     isThinking: Boolean,
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
-    onSquareClick: (Square) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit,
-    onPlayerColorChange: (PlayerColor) -> Unit,
-    onEngineSettingsChange: (EngineSettings) -> Unit
+    remainingTimes: StateFlow<Map<ChessColor, Long>>,
+    actions: GameActions
 ) {
     Row(
         modifier = Modifier
@@ -96,7 +85,7 @@ private fun LandscapeLayout(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                if (uiState.isCheckmate || uiState.isStalemate || uiState.isDraw) {
+                if (uiState.isGameOver) {
                     GameStatusCard(
                         uiState = uiState,
                         isThinking = isThinking,
@@ -107,9 +96,11 @@ private fun LandscapeLayout(
                     )
                 }
 
+                ClocksIfEnabled(uiState, remainingTimes, Modifier.padding(bottom = 8.dp))
+
                 ModernChessBoard(
                     uiState = uiState,
-                    onSquareClick = onSquareClick,
+                    onSquareClick = actions.onSquareClick,
                     modifier = Modifier.aspectRatio(1f)
                 )
 
@@ -125,7 +116,7 @@ private fun LandscapeLayout(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (!uiState.isCheckmate && !uiState.isStalemate && !uiState.isDraw) {
+            if (!uiState.isGameOver) {
                 GameStatusCard(
                     uiState = uiState,
                     isThinking = isThinking,
@@ -143,7 +134,13 @@ private fun LandscapeLayout(
                 )
             }
 
-            GameSettingsPanel(uiState, onPlayModeChange, onPlayerColorChange, onEngineSettingsChange)
+            GameSettingsPanel(
+                uiState,
+                actions.onPlayModeChange,
+                actions.onPlayerColorChange,
+                actions.onEngineSettingsChange,
+                actions.onTimeControlChange
+            )
         }
     }
 }
@@ -154,10 +151,8 @@ private fun PortraitLayout(
     isThinking: Boolean,
     isEngineReady: Boolean,
     currentOpening: OpeningInfo?,
-    onSquareClick: (Square) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit,
-    onPlayerColorChange: (PlayerColor) -> Unit,
-    onEngineSettingsChange: (EngineSettings) -> Unit
+    remainingTimes: StateFlow<Map<ChessColor, Long>>,
+    actions: GameActions
 ) {
     Column(
         modifier = Modifier
@@ -184,9 +179,11 @@ private fun PortraitLayout(
                 modifier = Modifier.padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                ClocksIfEnabled(uiState, remainingTimes)
+
                 ModernChessBoard(
                     uiState = uiState,
-                    onSquareClick = onSquareClick,
+                    onSquareClick = actions.onSquareClick,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
@@ -206,8 +203,28 @@ private fun PortraitLayout(
             )
         }
 
-        GameSettingsPanel(uiState, onPlayModeChange, onPlayerColorChange, onEngineSettingsChange)
+        GameSettingsPanel(
+            uiState,
+            actions.onPlayModeChange,
+            actions.onPlayerColorChange,
+            actions.onEngineSettingsChange,
+            actions.onTimeControlChange
+        )
     }
+}
+
+@Composable
+private fun ClocksIfEnabled(
+    uiState: ChessBoardUiState,
+    remainingTimes: StateFlow<Map<ChessColor, Long>>,
+    modifier: Modifier = Modifier
+) {
+    if (uiState.timeControl == null) return
+    GameClocks(
+        remainingTimes = remainingTimes,
+        activeColor = uiState.currentTurn.takeIf { !uiState.isGameOver && uiState.moveHistory.isNotEmpty() },
+        modifier = modifier
+    )
 }
 
 @Composable
