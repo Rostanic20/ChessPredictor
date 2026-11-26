@@ -59,19 +59,16 @@ actual class StockfishDataSource : ChessEngineDataSource {
     }
     
     override suspend fun analyze(settings: EngineSettings): EngineAnalysis {
-        val depth = settings.difficulty.depth
-        val timeLimit = settings.timeLimit  // Use actual timeLimit setting, not difficulty default!
-        val skillLevel = settings.difficulty.skillLevel
-        
-        sendCommand("setoption name UCI_LimitStrength value true")
-        delay(50)
-        sendCommand("setoption name UCI_Elo value ${settings.difficulty.eloRating}")
-        delay(50)
+        val strength = EngineStrength.of(settings)
+
+        sendCommand("setoption name UCI_LimitStrength value ${strength.limitStrength}")
+        strength.elo?.let { sendCommand("setoption name UCI_Elo value $it") }
+        sendCommand("setoption name Skill Level value ${strength.skillLevel}")
 
         sendCommand("isready")
         delay(100)
 
-        sendCommand("go depth $depth movetime $timeLimit")
+        sendCommand("go depth ${strength.depth} movetime ${settings.timeLimit}")
         
         var bestMove = ""
         var evaluation = 0f

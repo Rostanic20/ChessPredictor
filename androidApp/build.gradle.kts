@@ -4,10 +4,23 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val engineAssetsDir = layout.buildDirectory.dir("generated/engineAssets")
+
+val copyEngineAsset = tasks.register<Copy>("copyEngineAsset") {
+    from(rootProject.file("shared/src/jsMain/resources/stockfish.js"))
+    into(engineAssetsDir)
+}
+
+tasks.named("preBuild") {
+    dependsOn(copyEngineAsset)
+}
+
 android {
     namespace = "com.chesspredictor.android"
     compileSdk = 34
-    
+
+    sourceSets["main"].assets.srcDir(engineAssetsDir)
+
     defaultConfig {
         applicationId = "com.chesspredictor.android"
         minSdk = 24

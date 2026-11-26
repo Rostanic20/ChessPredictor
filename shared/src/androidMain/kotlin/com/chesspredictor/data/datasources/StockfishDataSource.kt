@@ -1,6 +1,7 @@
 package com.chesspredictor.data.datasources
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.webkit.*
 import com.chesspredictor.domain.entities.EngineSettings
@@ -14,6 +15,13 @@ import java.util.concurrent.TimeUnit
 actual class StockfishDataSource(private val context: Context) : ChessEngineDataSource {
     companion object {
         private const val TAG = "StockfishDataSource"
+        private const val ASSET_HOST = "appassets.androidplatform.net"
+
+        private fun mimeTypeOf(path: String): String = when (path.substringAfterLast('.')) {
+            "html" -> "text/html"
+            "js" -> "text/javascript"
+            else -> "application/octet-stream"
+        }
     }
     
     private var webView: WebView? = null
@@ -25,31 +33,34 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
     override suspend fun initialize() {
         withContext(Dispatchers.Main) {
             try {
-                
-                WebView.setWebContentsDebuggingEnabled(true)
-                
+                WebView.setWebContentsDebuggingEnabled(
+                    context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+                )
+
                 webView = WebView(context).apply {
                     settings.apply {
                         javaScriptEnabled = true
-                        allowFileAccess = true
-                        allowContentAccess = true
-                        domStorageEnabled = true
-                        databaseEnabled = true
-                        
-                        @Suppress("DEPRECATION")
-                        allowFileAccessFromFileURLs = true
-                        @Suppress("DEPRECATION")
-                        allowUniversalAccessFromFileURLs = true
-                        
+                        allowFileAccess = false
+                        allowContentAccess = false
                         cacheMode = WebSettings.LOAD_NO_CACHE
-                        
-                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         setSupportMultipleWindows(false)
                     }
-                    
+
                     addJavascriptInterface(StockfishJSInterface(), "Android")
-                    
+
                     webViewClient = object : WebViewClient() {
+                        override fun shouldInterceptRequest(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): WebResourceResponse? {
+                            val url = request?.url ?: return null
+                            if (url.host != ASSET_HOST) return null
+                            val path = url.path?.removePrefix("/") ?: return null
+                            return runCatching {
+                                WebResourceResponse(mimeTypeOf(path), "UTF-8", context.assets.open(path))
+                            }.getOrNull()
+                        }
+
                         override fun onReceivedError(
                             view: WebView?,
                             request: WebResourceRequest?,
@@ -71,7 +82,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
                     }
                 }
                 
-                webView?.loadUrl("file:///android_asset/stockfish_loader.html")
+                webView?.loadUrl("https://$ASSET_HOST/stockfish_loader.html")
                 
                 withContext(Dispatchers.IO) {
                     val initialized = initLatch.await(60, TimeUnit.SECONDS)
@@ -133,30 +144,13 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         Log.d(TAG, "Position set, proceeding with analysis")
     }
     
-    private suspend fun configureForSkillLevel(settings: EngineSettings) {
-        sendCommand("setoption name Skill Level value ${settings.skillLevel}")
-        
-        if (settings.skillLevel < 20) {
-            sendCommand("setoption name UCI_LimitStrength value true")
-            sendCommand("setoption name UCI_Elo value ${calculateElo(settings.skillLevel)}")
-        } else {
-            sendCommand("setoption name UCI_LimitStrength value false")
-        }
-        
-        sendCommand("setoption name Contempt value ${settings.contempt}")
+    private suspend fun applyStrength(strength: EngineStrength, settings: EngineSettings) {
+        sendCommand("setoption name UCI_LimitStrength value ${strength.limitStrength}")
+        strength.elo?.let { sendCommand("setoption name UCI_Elo value $it") }
+        sendCommand("setoption name Skill Level value ${strength.skillLevel}")
         sendCommand("setoption name MultiPV value ${settings.multiPV}")
-        
-        if (settings.skillLevel < 10) {
-            sendCommand("setoption name Hash value 16")
-        } else {
-            sendCommand("setoption name Hash value ${settings.hashSize}")
-        }
     }
-    
-    private fun calculateElo(skillLevel: Int): Int {
-        return 800 + (skillLevel * 100)
-    }
-    
+
     override suspend fun analyze(settings: EngineSettings): EngineAnalysis {
         if (!isInitialized) {
             Log.w(TAG, "Engine not initialized, returning empty analysis")
@@ -177,8 +171,9 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
             sendCommand("isready")
             delay(100)
             
-            configureForSkillLevel(settings)
-            
+            val strength = EngineStrength.of(settings)
+            applyStrength(strength, settings)
+
             var bestMove = ""
             var evaluation = 0f
             var depth = 0
@@ -252,10 +247,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
             }
             
             val goCommand = buildString {
-                append("go")
-                if (settings.difficulty.depth > 0) {
-                    append(" depth ${settings.difficulty.depth}")
-                }
+                append("go depth ${strength.depth}")
                 if (settings.timeLimit > 0) {
                     val actualTime = settings.timeLimit.coerceIn(300, 5000)
                     append(" movetime $actualTime")
