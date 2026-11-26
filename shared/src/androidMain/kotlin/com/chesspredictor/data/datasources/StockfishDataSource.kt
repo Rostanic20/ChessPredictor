@@ -17,6 +17,15 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         private const val TAG = "StockfishDataSource"
         private const val ASSET_HOST = "appassets.androidplatform.net"
 
+        private val DEPTH = Regex(" depth (\\d+)")
+        private val MATE = Regex("score mate (-?\\d+)")
+        private val CP = Regex("score cp (-?\\d+)")
+        private val NODES = Regex(" nodes (\\d+)")
+        private val NPS = Regex(" nps (\\d+)")
+        private val HASHFULL = Regex(" hashfull (\\d+)")
+        private val PV = Regex(" pv (.+)")
+        private val UCI_MOVE = Regex("[a-h][1-8][a-h][1-8][qrnb]?")
+
         private fun mimeTypeOf(path: String): String = when (path.substringAfterLast('.')) {
             "html" -> "text/html"
             "js" -> "text/javascript"
@@ -29,6 +38,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val outputFlow = MutableSharedFlow<String>()
     private val initLatch = CountDownLatch(1)
+    private val session = UciSession(::sendCommand)
     
     override suspend fun initialize() {
         withContext(Dispatchers.Main) {
@@ -109,6 +119,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
     inner class StockfishJSInterface {
         @JavascriptInterface
         fun onMessage(message: String) {
+            session.onLine(message)
             coroutineScope.launch {
                 outputFlow.emit(message)
             }
@@ -138,20 +149,15 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
     }
     
     override suspend fun setPosition(fen: String) {
-        Log.d(TAG, "Setting position: $fen")
-        sendCommand("position fen $fen")
-        delay(200)
-        sendCommand("isready")
-        delay(100)
-        Log.d(TAG, "Position set, proceeding with analysis")
+        if (isInitialized) session.setPosition(fen)
     }
-    
-    private suspend fun applyStrength(strength: EngineStrength, settings: EngineSettings) {
-        sendCommand("setoption name UCI_LimitStrength value ${strength.limitStrength}")
-        strength.elo?.let { sendCommand("setoption name UCI_Elo value $it") }
-        sendCommand("setoption name Skill Level value ${strength.skillLevel}")
-        sendCommand("setoption name MultiPV value ${settings.multiPV}")
-    }
+
+    private fun strengthCommands(strength: EngineStrength, settings: EngineSettings): List<String> = listOfNotNull(
+        "setoption name UCI_LimitStrength value ${strength.limitStrength}",
+        strength.elo?.let { "setoption name UCI_Elo value $it" },
+        "setoption name Skill Level value ${strength.skillLevel}",
+        "setoption name MultiPV value ${settings.multiPV}"
+    )
 
     override suspend fun analyze(settings: EngineSettings): EngineAnalysis {
         if (!isInitialized) {
@@ -166,127 +172,62 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
             )
         }
         
-        return withContext(Dispatchers.IO) {
-            sendCommand("stop")
-            delay(100)
-
-            sendCommand("isready")
-            delay(100)
-            
-            val strength = EngineStrength.of(settings)
-            applyStrength(strength, settings)
-
-            var bestMove = ""
-            var evaluation = 0f
-            var depth = 0
-            var nodes = 0L
-            var mate: Int? = null
-            var nps = 0L
-            var hashfull = 0
-            val pv = mutableListOf<String>()
-            val alternativeMoves = mutableListOf<String>()
-            
-            val job = launch {
-                outputFlow.collect { line ->
-                    when {
-                        line.startsWith("bestmove ") -> {
-                            Log.d(TAG, "Engine response: $line")
-                            val parts = line.split(" ")
-                            if (parts.size >= 2) {
-                                bestMove = parts[1]
-                                Log.d(TAG, "Extracted bestMove: $bestMove")
-                            }
-                            cancel()
-                        }
-                        line.startsWith("info ") && line.contains("depth ") -> {
-                            val depthMatch = Regex("depth (\\d+)").find(line)
-                            depthMatch?.let { 
-                                val newDepth = it.groupValues[1].toInt()
-                                if (newDepth >= depth) {
-                                    depth = newDepth
-                                }
-                            }
-                            
-                            val mateMatch = Regex("score mate (-?\\d+)").find(line)
-                            if (mateMatch != null) {
-                                mate = mateMatch.groupValues[1].toInt()
-                                evaluation = if (mate!! > 0) 999f else -999f
-                            } else {
-                                val scoreMatch = Regex("score cp (-?\\d+)").find(line)
-                                scoreMatch?.let { 
-                                    evaluation = it.groupValues[1].toFloat() / 100f
-                                    mate = null
-                                }
-                            }
-                            
-                            val nodesMatch = Regex("nodes (\\d+)").find(line)
-                            nodesMatch?.let { nodes = it.groupValues[1].toLong() }
-                            
-                            val npsMatch = Regex("nps (\\d+)").find(line)
-                            npsMatch?.let { nps = it.groupValues[1].toLong() }
-                            
-                            val hashMatch = Regex("hashfull (\\d+)").find(line)
-                            hashMatch?.let { hashfull = it.groupValues[1].toInt() }
-                            
-                            val pvMatch = Regex("pv (.+)").find(line)
-                            pvMatch?.let {
-                                val moves = it.groupValues[1].split(" ").filter { move -> 
-                                    move.matches(Regex("[a-h][1-8][a-h][1-8][qrnb]?"))
-                                }
-                                if (moves.isNotEmpty()) {
-                                    pv.clear()
-                                    pv.addAll(moves)
-                                    
-                                    val firstMove = moves[0]
-                                    if (!alternativeMoves.contains(firstMove) && alternativeMoves.size < 3) {
-                                        alternativeMoves.add(firstMove)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            val goCommand = buildString {
-                append("go depth ${strength.depth}")
-                if (settings.timeLimit > 0) {
-                    val actualTime = settings.timeLimit.coerceIn(300, 5000)
-                    append(" movetime $actualTime")
-                }
-                if (settings.timeLimit < 100) {
-                    append(" nodes 100000")
-                }
-            }
-            
-            Log.d(TAG, "Sending go command: $goCommand")
-            sendCommand(goCommand)
-            
-            val timeout = maxOf(settings.timeLimit + 2000L, 5000L)
-            val timeoutJob = launch {
-                delay(timeout)
-                if (job.isActive) {
-                    Log.w(TAG, "Engine analysis timed out after ${timeout}ms")
-                    job.cancel()
-                }
-            }
-            
-            job.join()
-            timeoutJob.cancel()
-            
-            EngineAnalysis(
-                bestMove = bestMove,
-                evaluation = evaluation,
-                depth = depth,
-                principalVariation = pv,
-                nodes = nodes,
-                time = settings.difficulty.timeMs.toLong(),
-                mate = mate,
-                alternativeMoves = alternativeMoves,
-                nps = nps,
-                hashfull = hashfull
-            )
+        val strength = EngineStrength.of(settings)
+        val goCommand = buildString {
+            append("go depth ${strength.depth}")
+            if (settings.timeLimit > 0) append(" movetime ${settings.timeLimit.coerceIn(300, 5000)}")
+            if (settings.timeLimit < 100) append(" nodes 100000")
         }
+
+        var evaluation = 0f
+        var depth = 0
+        var nodes = 0L
+        var mate: Int? = null
+        var nps = 0L
+        var hashfull = 0
+        val pv = mutableListOf<String>()
+        val alternativeMoves = mutableListOf<String>()
+
+        val timeout = maxOf(settings.timeLimit + 2000L, 5000L)
+        val bestMoveLine = session.search(strengthCommands(strength, settings), goCommand, timeout) { line ->
+            if (!line.contains(" depth ")) return@search
+            DEPTH.find(line)?.let { depth = maxOf(depth, it.groupValues[1].toInt()) }
+            val mateScore = MATE.find(line)
+            if (mateScore != null) {
+                mate = mateScore.groupValues[1].toInt()
+                evaluation = if (mateScore.groupValues[1].toInt() > 0) 999f else -999f
+            } else {
+                CP.find(line)?.let {
+                    evaluation = it.groupValues[1].toFloat() / 100f
+                    mate = null
+                }
+            }
+            NODES.find(line)?.let { nodes = it.groupValues[1].toLong() }
+            NPS.find(line)?.let { nps = it.groupValues[1].toLong() }
+            HASHFULL.find(line)?.let { hashfull = it.groupValues[1].toInt() }
+            PV.find(line)?.let { match ->
+                val moves = match.groupValues[1].split(" ").filter { UCI_MOVE.matches(it) }
+                if (moves.isNotEmpty()) {
+                    pv.clear()
+                    pv.addAll(moves)
+                    if (moves[0] !in alternativeMoves && alternativeMoves.size < 3) alternativeMoves.add(moves[0])
+                }
+            }
+        }
+        if (bestMoveLine == null) Log.w(TAG, "Engine analysis timed out after ${timeout}ms")
+
+        return EngineAnalysis(
+            bestMove = bestMoveLine?.split(" ")?.getOrNull(1)?.takeIf { it != "(none)" }.orEmpty(),
+            evaluation = evaluation,
+            depth = depth,
+            principalVariation = pv,
+            nodes = nodes,
+            time = settings.difficulty.timeMs.toLong(),
+            mate = mate,
+            alternativeMoves = alternativeMoves,
+            nps = nps,
+            hashfull = hashfull
+        )
     }
     
     override fun getOutput(): Flow<String> = outputFlow.asSharedFlow()
