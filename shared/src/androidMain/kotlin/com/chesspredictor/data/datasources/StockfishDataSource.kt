@@ -55,10 +55,12 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
                         ): WebResourceResponse? {
                             val url = request?.url ?: return null
                             if (url.host != ASSET_HOST) return null
-                            val path = url.path?.removePrefix("/") ?: return null
+                            val path = url.path?.removePrefix("/").orEmpty()
                             return runCatching {
                                 WebResourceResponse(mimeTypeOf(path), "UTF-8", context.assets.open(path))
-                            }.getOrNull()
+                            }.getOrElse {
+                                WebResourceResponse("text/plain", "UTF-8", 404, "Not Found", emptyMap(), null)
+                            }
                         }
 
                         override fun onReceivedError(
@@ -66,7 +68,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
                             request: WebResourceRequest?,
                             error: WebResourceError?
                         ) {
-                            Log.e(TAG, "WebView error: ${error?.description}")
+                            Log.e(TAG, "WebView error: ${error?.description} for ${request?.url}")
                         }
                     }
                     
