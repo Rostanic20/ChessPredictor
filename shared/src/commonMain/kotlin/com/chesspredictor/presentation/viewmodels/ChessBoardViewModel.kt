@@ -33,6 +33,7 @@ import com.chesspredictor.presentation.managers.SettingsManager
 import com.chesspredictor.presentation.ErrorStateManager
 import com.chesspredictor.presentation.ChessError
 import com.chesspredictor.utils.ChessLogger
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,7 +53,8 @@ class ChessBoardViewModel(
     gameStateRepository: GameStateRepository? = null,
     private val chessRulesEngine: ChessRulesEngine = ChessRulesEngine(),
     private val openingDetector: OpeningDetector = OpeningDetector(),
-    private val importExportGameUseCase: ImportExportGameUseCase = ImportExportGameUseCase()
+    private val importExportGameUseCase: ImportExportGameUseCase = ImportExportGameUseCase(),
+    private val background: CoroutineDispatcher = Dispatchers.Default
 ) {
     private val appModule: AppModule = providedAppModule ?: getOrCreateAppModule()
     private val viewModelScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -146,7 +148,7 @@ class ChessBoardViewModel(
             return
         }
         openingJob = viewModelScope.launch {
-            _currentOpening.value = withContext(Dispatchers.Default) {
+            _currentOpening.value = withContext(background) {
                 runCatching { openingDetector.detectOpening(history) }.getOrNull()
             }
         }
@@ -486,7 +488,7 @@ class ChessBoardViewModel(
 
     fun importGame(content: String, format: ExportFormat) {
         viewModelScope.launch {
-            withContext(Dispatchers.Default) { importExportGameUseCase.importGame(content, format) }
+            withContext(background) { importExportGameUseCase.importGame(content, format) }
                 .onSuccess { importedData ->
                     cancelPendingWork()
                     gameStateManager.updateFromGameState(importedData.gameState)

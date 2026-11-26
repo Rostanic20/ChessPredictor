@@ -65,7 +65,11 @@ class ChessBoardViewModelLifecycleTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.humanGame(repository: GameStateRepository): ChessBoardViewModel {
-        val viewModel = ChessBoardViewModel(providedAppModule = AppModule { engine }, gameStateRepository = repository)
+        val viewModel = ChessBoardViewModel(
+            providedAppModule = AppModule { engine },
+            gameStateRepository = repository,
+            background = Dispatchers.Main
+        )
         viewModel.initializeBoard()
         viewModel.setPlayMode(PlayMode.VS_HUMAN)
         advanceUntilIdle()
