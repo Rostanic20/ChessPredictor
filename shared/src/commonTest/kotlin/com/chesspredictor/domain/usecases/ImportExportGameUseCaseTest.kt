@@ -133,6 +133,21 @@ class ImportExportGameUseCaseTest {
     }
 
     @Test
+    fun invalidFenIsRejectedWithAReadableReason() {
+        mapOf(
+            "4k2P/8/8/8/8/8/8/4K3 w - - 0 1" to "pawns",
+            "8/8/8/8/8/8/8/4K3 w - - 0 1" to "king",
+            "4k3/8/8/8/8/8/8/4K3 x - - 0 1" to "side to move",
+            "4k3/8/8/8/8/8/8 w - - 0 1" to "8 ranks",
+            "4k3/9/8/8/8/8/8/4K3 w - - 0 1" to "unexpected",
+            "4k3/4Q3/8/8/8/8/8/4K3 w - - 0 1" to "not to move is in check"
+        ).forEach { (fen, reason) ->
+            val error = useCase.importGame(fen, ExportFormat.FEN).exceptionOrNull()
+            assertTrue(error?.message?.contains(reason) == true, "$fen -> ${error?.message}")
+        }
+    }
+
+    @Test
     fun knightShuffleIsDrawnOnTheThirdOccurrence() {
         val twice = play(startPosition(), "g1f3", "g8f6", "f3g1", "f6g8")
         assertFalse(twice.isDraw)

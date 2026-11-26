@@ -14,6 +14,8 @@ import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.KeyMoment
 import com.chesspredictor.domain.entities.KeyMomentType
 import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.entities.opposite
+import com.chesspredictor.domain.utils.FenValidator
 import com.chesspredictor.utils.TimeProvider
 import com.chesspredictor.presentation.ChessConstants
 import kotlinx.serialization.encodeToString
@@ -57,7 +59,7 @@ class ImportExportGameUseCase(
                 ExportFormat.FEN -> importFromFEN(content)
             }
         } catch (e: Exception) {
-            Result.failure(IllegalArgumentException("Failed to import game: ${e.message}"))
+            Result.failure(IllegalArgumentException(e.message ?: "unreadable game data", e))
         }
     }
     
@@ -201,7 +203,7 @@ class ImportExportGameUseCase(
             }
         }
 
-        var gameState = chessRulesEngine.parseGameState(headers["FEN"] ?: ChessConstants.STARTING_POSITION_FEN)
+        var gameState = parseUserFen(headers["FEN"] ?: ChessConstants.STARTING_POSITION_FEN)
 
         for ((index, san) in pgnMoveTokens(moveText.toString()).withIndex()) {
             val move = parseSANMove(san, gameState)
@@ -240,7 +242,7 @@ class ImportExportGameUseCase(
             replayExportedMoves(data.startFen, data.moves)
                 ?: return Result.failure(IllegalArgumentException("Moves do not replay from the start position"))
         } else {
-            val finalPosition = chessRulesEngine.withStatus(chessRulesEngine.parseGameState(data.fen))
+            val finalPosition = chessRulesEngine.withStatus(parseUserFen(data.fen))
             replayExportedMoves(ChessConstants.STARTING_POSITION_FEN, data.moves)
                 ?.takeIf { it.toPositionKey() == finalPosition.toPositionKey() }
                 ?: finalPosition
@@ -285,8 +287,17 @@ class ImportExportGameUseCase(
         )
     }
     
+    private fun parseUserFen(fen: String): GameState {
+        FenValidator.problemWith(fen)?.let { throw IllegalArgumentException("Invalid FEN: $it") }
+        val state = chessRulesEngine.parseGameState(fen.trim())
+        require(!chessRulesEngine.isKingInCheck(state, state.turn.opposite())) {
+            "Invalid FEN: the side not to move is in check"
+        }
+        return state
+    }
+
     private fun replayExportedMoves(startFen: String, moves: List<ExportedMove>): GameState? {
-        var gameState = chessRulesEngine.parseGameState(startFen)
+        var gameState = parseUserFen(startFen)
         for (exportedMove in moves) {
             val from = Square.fromString(exportedMove.from)
             val to = Square.fromString(exportedMove.to)
@@ -304,14 +315,8 @@ class ImportExportGameUseCase(
         return gameState
     }
 
-    private fun importFromFEN(fen: String): Result<ImportedGameData> {
-        return try {
-            val gameState = chessRulesEngine.withStatus(chessRulesEngine.parseGameState(fen.trim()))
-            Result.success(ImportedGameData(gameState = gameState))
-        } catch (e: Exception) {
-            Result.failure(IllegalArgumentException("Invalid FEN: ${e.message}"))
-        }
-    }
+    private fun importFromFEN(fen: String): Result<ImportedGameData> =
+        Result.success(ImportedGameData(gameState = chessRulesEngine.withStatus(parseUserFen(fen))))
     
     private fun pgnMoveTokens(moveText: String): List<String> {
         val mainLine = StringBuilder()

@@ -62,14 +62,15 @@ class MoveGenerator {
         gameState: GameState, from: Square, pawn: ChessPiece.Pawn,
         direction: Int, startRank: Int, promotionRank: Int, moves: MutableList<ChessMove>
     ) {
+        if (from.rank + direction !in 1..8) return
         val oneForward = Square(from.file, from.rank + direction)
-        if (!isValidSquare(oneForward) || gameState.board[oneForward] != null) return
+        if (gameState.board[oneForward] != null) return
 
         addPawnMoveOrPromotion(from, oneForward, pawn, null, promotionRank, moves)
 
         if (from.rank == startRank) {
             val twoForward = Square(from.file, from.rank + 2 * direction)
-            if (isValidSquare(twoForward) && gameState.board[twoForward] == null) {
+            if (gameState.board[twoForward] == null) {
                 moves.add(ChessMove(from, twoForward, pawn))
             }
         }
@@ -79,12 +80,12 @@ class MoveGenerator {
         gameState: GameState, from: Square, pawn: ChessPiece.Pawn,
         direction: Int, promotionRank: Int, moves: MutableList<ChessMove>
     ) {
+        if (from.rank + direction !in 1..8) return
         for (fileDelta in listOf(-1, 1)) {
             val captureFile = (from.file.code + fileDelta).toChar()
             if (captureFile !in 'a'..'h') continue
 
             val captureSquare = Square(captureFile, from.rank + direction)
-            if (!isValidSquare(captureSquare)) continue
 
             val targetPiece = gameState.board[captureSquare]
             if (targetPiece != null && targetPiece.color != pawn.color) {
@@ -289,10 +290,6 @@ class MoveGenerator {
         return squaresToCheckAttack.none { isSquareAttackedBy(gameState, it, color.opposite()) }
     }
     
-    private fun isValidSquare(square: Square): Boolean {
-        return square.file in 'a'..'h' && square.rank in 1..8
-    }
-
     private fun wouldKingBeInCheck(gameState: GameState, color: ChessColor): Boolean {
         val kingSquare = AttackDetector.findKingSquare(gameState, color) ?: return false
         return AttackDetector.isSquareAttackedBy(gameState, kingSquare, color.opposite())

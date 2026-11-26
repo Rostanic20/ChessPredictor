@@ -1,6 +1,5 @@
 package com.chesspredictor.domain.usecases.components
 
-import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.GameState
 import com.chesspredictor.domain.entities.Square
@@ -31,33 +30,11 @@ class DrawDetector {
     }
     
     fun isInsufficientMaterial(gameState: GameState): Boolean {
-        val piecesBySquare = gameState.board
-        val whitePieces = piecesBySquare.filter { it.value.color == ChessColor.WHITE }
-        val blackPieces = piecesBySquare.filter { it.value.color == ChessColor.BLACK }
-
-        return hasInsufficientMaterial(whitePieces) && hasInsufficientMaterial(blackPieces)
-    }
-
-    private fun hasInsufficientMaterial(pieces: Map<Square, ChessPiece>): Boolean {
-        val nonKingPieces = pieces.filter { it.value !is ChessPiece.King }
-
-        return when (nonKingPieces.size) {
-            0 -> true
-            1 -> {
-                val piece = nonKingPieces.values.first()
-                piece is ChessPiece.Bishop || piece is ChessPiece.Knight
-            }
-            2 -> {
-                val bishops = nonKingPieces.filter { it.value is ChessPiece.Bishop }
-                if (bishops.size == 2) {
-                    val squares = bishops.keys.toList()
-                    isLightSquare(squares[0]) == isLightSquare(squares[1])
-                } else {
-                    false
-                }
-            }
-            else -> false
-        }
+        val minors = gameState.board.filterValues { it !is ChessPiece.King }
+        if (minors.values.any { it !is ChessPiece.Bishop && it !is ChessPiece.Knight }) return false
+        if (minors.size <= 1) return true
+        if (minors.values.any { it is ChessPiece.Knight }) return false
+        return minors.keys.map(::isLightSquare).distinct().size == 1
     }
 
     private fun isLightSquare(square: Square): Boolean {

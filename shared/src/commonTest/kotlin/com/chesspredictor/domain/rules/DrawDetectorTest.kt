@@ -118,8 +118,20 @@ class DrawDetectorTest {
     }
 
     @Test
+    fun matingIsStillPossibleWithTheseMinorPieces() {
+        listOf(
+            "4k3/8/8/8/8/8/8/1n2K1N1 w - - 0 1",
+            "4k3/8/8/8/8/8/8/1n2KB2 w - - 0 1",
+            "4kb2/8/8/8/8/8/8/4KB2 w - - 0 1",
+            "4k3/8/8/8/8/8/8/1N2K1N1 w - - 0 1"
+        ).forEach { fen ->
+            assertFalse(drawDetector.isInsufficientMaterial(fenParser.parseGameState(fen)), fen)
+        }
+    }
+
+    @Test
     fun testKingBishopVsKingBishopSameColorInsufficient() {
-        val state = fenParser.parseGameState("4k1b1/8/8/8/8/8/8/2B1K3 w - - 0 1")
+        val state = fenParser.parseGameState("4kb2/8/8/8/8/8/8/2B1K3 w - - 0 1")
         assertTrue(drawDetector.isInsufficientMaterial(state))
     }
 }
