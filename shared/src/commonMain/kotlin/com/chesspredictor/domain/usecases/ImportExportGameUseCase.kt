@@ -4,7 +4,6 @@ import com.chesspredictor.domain.entities.AnalysisData
 import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
-import com.chesspredictor.domain.entities.DetailedMove
 import com.chesspredictor.domain.entities.ExportedGame
 import com.chesspredictor.domain.entities.ExportedKeyMoment
 import com.chesspredictor.domain.entities.ExportedMove
@@ -26,6 +25,10 @@ import kotlin.math.abs
 class ImportExportGameUseCase(
     private val chessRulesEngine: ChessRulesEngine = ChessRulesEngine()
 ) {
+    private companion object {
+        val PGN_RESULTS = setOf("1-0", "0-1", "1/2-1/2", "*")
+    }
+
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -69,8 +72,9 @@ class ImportExportGameUseCase(
         pgn.appendLine("[Black \"${additionalData?.black ?: "Engine"}\"]")
         pgn.appendLine("[Result \"${getGameResult(gameState)}\"]")
         
-        if (gameState.toFen() != ChessConstants.STARTING_POSITION_FEN) {
-            pgn.appendLine("[FEN \"${gameState.toFen()}\"]")
+        val startFen = startingFen(gameState)
+        if (startFen != ChessConstants.STARTING_POSITION_FEN) {
+            pgn.appendLine("[FEN \"$startFen\"]")
             pgn.appendLine("[SetUp \"1\"]")
         }
         
@@ -84,11 +88,16 @@ class ImportExportGameUseCase(
         
         pgn.appendLine()
         
+        val start = chessRulesEngine.parseGameState(startFen)
+        val blackMovesFirst = start.turn == ChessColor.BLACK
         gameState.moveHistory.forEachIndexed { index, move ->
-            if (index % 2 == 0) {
-                pgn.append("${(index / 2) + 1}. ")
+            val ply = if (blackMovesFirst) index + 1 else index
+            val moveNumber = start.fullMoveNumber + ply / 2
+            when {
+                ply % 2 == 0 -> pgn.append("$moveNumber. ")
+                index == 0 -> pgn.append("$moveNumber... ")
             }
-            
+
             pgn.append(move.san)
             
             additionalData?.moveComments?.get(index)?.let { comment ->
@@ -139,7 +148,8 @@ class ImportExportGameUseCase(
             fen = gameState.toFen(),
             moves = exportedMoves,
             currentPly = gameState.fullMoveNumber * 2 - (if (gameState.turn == ChessColor.WHITE) 2 else 1),
-            timeControl = additionalData?.timeControl
+            timeControl = additionalData?.timeControl,
+            startFen = startingFen(gameState)
         )
         
         val analysisData = if (additionalData?.whiteAccuracy != null || additionalData?.blackAccuracy != null) {
@@ -179,60 +189,27 @@ class ImportExportGameUseCase(
     private fun importFromPGN(pgn: String): Result<ImportedGameData> {
         val headers = mutableMapOf<String, String>()
         val moveText = StringBuilder()
-        var inHeaders = true
-        
-        pgn.lines().forEach { line ->
-            when {
-                line.startsWith("[") && line.endsWith("]") -> {
-                    val match = Regex("\\[(\\w+)\\s+\"([^\"]+)\"\\]").find(line)
-                    match?.let {
-                        headers[it.groupValues[1]] = it.groupValues[2]
-                    }
-                }
-                line.isBlank() && inHeaders -> {
-                    inHeaders = false
-                }
-                !inHeaders -> {
-                    moveText.append(line).append(" ")
-                }
+        val headerPattern = Regex("^\\[(\\w+)\\s+\"(.*)\"\\]$")
+
+        pgn.lines().forEach { rawLine ->
+            val line = rawLine.trim()
+            val header = headerPattern.find(line)
+            if (header != null) {
+                headers[header.groupValues[1]] = header.groupValues[2]
+            } else {
+                moveText.append(line.substringBefore(';')).append(' ')
             }
         }
-        
-        val startingFen = headers["FEN"] ?: ChessConstants.STARTING_POSITION_FEN
-        var gameState = chessRulesEngine.parseGameState(startingFen)
-        
-        val moves = mutableListOf<DetailedMove>()
-        val movePattern = Regex("\\d+\\.\\s*([^\\s]+)\\s*([^\\s]+)?")
-        
-        movePattern.findAll(moveText.toString()).forEach { matchResult ->
-            val whiteSan = matchResult.groupValues[1]
-            val blackSan = matchResult.groupValues[2].takeIf { it.isNotEmpty() }
-            
-            if (whiteSan.isNotEmpty() && !whiteSan.contains("*") && !whiteSan.contains("-")) {
-                val move = parseSANMove(whiteSan, gameState)
-                if (move != null) {
-                    val newState = chessRulesEngine.makeMove(gameState, move)
-                    if (newState != null) {
-                        moves.add(newState.moveHistory.last())
-                        gameState = newState
-                    }
-                }
-            }
-            
-            blackSan?.let { san ->
-                if (!san.contains("*") && !san.contains("-")) {
-                    val move = parseSANMove(san, gameState)
-                    if (move != null) {
-                        val newState = chessRulesEngine.makeMove(gameState, move)
-                        if (newState != null) {
-                            moves.add(newState.moveHistory.last())
-                            gameState = newState
-                        }
-                    }
-                }
-            }
+
+        var gameState = chessRulesEngine.parseGameState(headers["FEN"] ?: ChessConstants.STARTING_POSITION_FEN)
+
+        for ((index, san) in pgnMoveTokens(moveText.toString()).withIndex()) {
+            val move = parseSANMove(san, gameState)
+                ?: return Result.failure(IllegalArgumentException("Unrecognized move '$san' at ply ${index + 1}"))
+            gameState = chessRulesEngine.makeMove(gameState, move)
+                ?: return Result.failure(IllegalArgumentException("Illegal move '$san' at ply ${index + 1}"))
         }
-        
+
         val additionalData = ExportAdditionalData(
             event = headers["Event"],
             site = headers["Site"],
@@ -257,45 +234,18 @@ class ImportExportGameUseCase(
     
     private fun importFromJSON(jsonStr: String): Result<ImportedGameData> {
         val exportedGame = json.decodeFromString<ExportedGame>(jsonStr)
-        
-        var gameState = chessRulesEngine.parseGameState(exportedGame.gameData.fen)
-        if (exportedGame.gameData.moves.isNotEmpty()) {
-            val startingFen = if (exportedGame.gameData.currentPly > exportedGame.gameData.moves.size) {
-                exportedGame.gameData.fen
-            } else {
-                ChessConstants.STARTING_POSITION_FEN
-            }
-            
-            gameState = chessRulesEngine.parseGameState(startingFen)
-            
-            for (exportedMove in exportedGame.gameData.moves) {
-                val fromSquare = Square.fromString(exportedMove.from)
-                val piece = gameState.board[fromSquare] ?: continue
-                val move = ChessMove(
-                    from = fromSquare,
-                    to = Square.fromString(exportedMove.to),
-                    piece = piece,
-                    capturedPiece = exportedMove.captured?.let {
-                        gameState.board[Square.fromString(exportedMove.to)]
-                    },
-                    promotion = exportedMove.promotion?.let { promotionType ->
-                        when (promotionType) {
-                            "QUEEN" -> ChessPiece.Queen(gameState.turn)
-                            "ROOK" -> ChessPiece.Rook(gameState.turn)
-                            "BISHOP" -> ChessPiece.Bishop(gameState.turn)
-                            "KNIGHT" -> ChessPiece.Knight(gameState.turn)
-                            else -> null
-                        }
-                    }
-                )
-                
-                val newState = chessRulesEngine.makeMove(gameState, move)
-                if (newState != null) {
-                    gameState = newState
-                }
-            }
+        val data = exportedGame.gameData
+
+        val gameState = if (data.startFen != null) {
+            replayExportedMoves(data.startFen, data.moves)
+                ?: return Result.failure(IllegalArgumentException("Moves do not replay from the start position"))
+        } else {
+            val finalPosition = chessRulesEngine.parseGameState(data.fen)
+            replayExportedMoves(ChessConstants.STARTING_POSITION_FEN, data.moves)
+                ?.takeIf { it.toPositionKey() == finalPosition.toPositionKey() }
+                ?: finalPosition
         }
-        
+
         val additionalData = ExportAdditionalData(
             event = exportedGame.gameData.event,
             site = exportedGame.gameData.site,
@@ -316,12 +266,13 @@ class ImportExportGameUseCase(
                 .mapIndexedNotNull { index, move -> 
                     move.comment?.let { index to it }
                 }.toMap(),
-            keyMoments = exportedGame.analysis?.keyMoments?.map { km ->
+            keyMoments = exportedGame.analysis?.keyMoments?.mapNotNull { km ->
+                val type = KeyMomentType.entries.find { it.name == km.type } ?: return@mapNotNull null
                 KeyMoment(
                     moveNumber = km.moveNumber,
                     description = km.description,
                     evaluationSwing = 0f,
-                    type = KeyMomentType.valueOf(km.type)
+                    type = type
                 )
             }
         )
@@ -334,6 +285,25 @@ class ImportExportGameUseCase(
         )
     }
     
+    private fun replayExportedMoves(startFen: String, moves: List<ExportedMove>): GameState? {
+        var gameState = chessRulesEngine.parseGameState(startFen)
+        for (exportedMove in moves) {
+            val from = Square.fromString(exportedMove.from)
+            val to = Square.fromString(exportedMove.to)
+            val piece = gameState.board[from] ?: return null
+            val promotion = when (exportedMove.promotion) {
+                "QUEEN" -> ChessPiece.Queen(gameState.turn)
+                "ROOK" -> ChessPiece.Rook(gameState.turn)
+                "BISHOP" -> ChessPiece.Bishop(gameState.turn)
+                "KNIGHT" -> ChessPiece.Knight(gameState.turn)
+                else -> null
+            }
+            val move = ChessMove(from, to, piece, gameState.board[to], promotion)
+            gameState = chessRulesEngine.makeMove(gameState, move) ?: return null
+        }
+        return gameState
+    }
+
     private fun importFromFEN(fen: String): Result<ImportedGameData> {
         return try {
             val gameState = chessRulesEngine.parseGameState(fen)
@@ -343,15 +313,47 @@ class ImportExportGameUseCase(
         }
     }
     
+    private fun pgnMoveTokens(moveText: String): List<String> {
+        val mainLine = StringBuilder()
+        var variationDepth = 0
+        var inComment = false
+        for (char in moveText) {
+            when {
+                inComment -> if (char == '}') inComment = false
+                char == '{' -> inComment = true
+                char == '(' -> variationDepth++
+                char == ')' -> if (variationDepth > 0) variationDepth--
+                variationDepth == 0 -> mainLine.append(char)
+            }
+        }
+
+        return mainLine.split(Regex("\\s+"))
+            .map { it.replace(Regex("^\\d+\\.+"), "") }
+            .filter { it.isNotEmpty() && !it.startsWith("$") && it !in PGN_RESULTS }
+            .map { it.trimEnd('!', '?').replace("0-0-0", "O-O-O").replace("0-0", "O-O") }
+            .filter { it.isNotEmpty() }
+    }
+
     private fun parseSANMove(san: String, gameState: GameState): ChessMove? {
-        val legalMoves = chessRulesEngine.getLegalMoves(gameState)
-        
-        return legalMoves.find { move ->
+        val wanted = normalizeSan(san)
+        return chessRulesEngine.getLegalMoves(gameState).find { move ->
             val moveState = chessRulesEngine.makeMove(gameState, move)
-            moveState?.moveHistory?.lastOrNull()?.san == san
+            moveState?.moveHistory?.lastOrNull()?.san?.let(::normalizeSan) == wanted
         }
     }
+
+    private fun normalizeSan(san: String): String = san.trimEnd('+', '#')
     
+    private fun startingFen(gameState: GameState): String {
+        val plies = gameState.moveHistory.size
+        return when {
+            plies == 0 -> gameState.toFen()
+            gameState.positionHistory.size >= plies ->
+                gameState.positionHistory[gameState.positionHistory.size - plies]
+            else -> ChessConstants.STARTING_POSITION_FEN
+        }
+    }
+
     private fun getGameResult(gameState: GameState): String {
         return when {
             gameState.isCheckmate -> {

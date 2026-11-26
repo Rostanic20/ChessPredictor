@@ -20,10 +20,10 @@ class DrawDetector {
     
     fun isThreefoldRepetition(gameState: GameState): Boolean {
         val currentPosition = gameState.toFen().split(" ").take(4).joinToString(" ")
-        val occurrences = gameState.positionHistory.count { position ->
+        val earlierOccurrences = gameState.positionHistory.count { position ->
             position.split(" ").take(4).joinToString(" ") == currentPosition
         }
-        return occurrences >= THREEFOLD_REPETITION_THRESHOLD
+        return earlierOccurrences + 1 >= THREEFOLD_REPETITION_THRESHOLD
     }
     
     fun isFiftyMoveRule(gameState: GameState): Boolean {
