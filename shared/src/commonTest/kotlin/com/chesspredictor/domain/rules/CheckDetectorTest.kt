@@ -65,8 +65,9 @@ class CheckDetectorTest {
 
     @Test
     fun testNotCheckmateCanBlock() {
-        val state = fenParser.parseGameState("4k3/8/8/8/8/8/4r3/R3K3 b - - 0 1")
-        assertFalse(checkDetector.isCheckmate(state))
+        val state = fenParser.parseGameState("R6k/6pp/8/8/8/8/8/3rK3 b - - 0 1")
+        assertTrue(checkDetector.isInCheck(state, ChessColor.BLACK))
+        assertFalse(checkDetector.isCheckmate(state), "Rd8 blocks the back-rank check")
     }
 
     @Test

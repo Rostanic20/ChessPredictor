@@ -188,16 +188,15 @@ class MoveGeneratorTest {
 
     @Test
     fun testPinnedPieceCannotMove() {
-        // White knight at d2 pinned to king at e1 by black rook at a2 - wait that's not a pin
-        // Black bishop at a4 pins white knight at c2 to white king at e1? No, that's diagonal
-        // Let's use: white knight at d1, black rook at d8, white king at d3 - nah
-        // Simple pin: white king at e1, white bishop at e2, black rook at e8
         val state = fenParser.parseGameState("4r3/8/8/8/8/8/4B3/4K2k w - - 0 1")
         val bishopMoves = moveGenerator.generateLegalMoves(state).filter { it.from == Square('e', 2) }
-        // Bishop on e2 is pinned to king on e1 by rook on e8 — can only move along the pin line
-        val targets = bishopMoves.map { it.to }.toSet()
-        for (target in targets) {
-            assertEquals('e', target.file, "Pinned bishop can only move along the e-file")
-        }
+        assertTrue(bishopMoves.isEmpty(), "A bishop pinned on a file has no legal move, got $bishopMoves")
+    }
+
+    @Test
+    fun testPinnedRookMovesOnlyAlongThePin() {
+        val state = fenParser.parseGameState("4r3/8/8/8/8/8/4R3/4K2k w - - 0 1")
+        val targets = moveGenerator.generateLegalMoves(state).filter { it.from == Square('e', 2) }.map { it.to }.toSet()
+        assertEquals((3..8).map { Square('e', it) }.toSet(), targets)
     }
 }

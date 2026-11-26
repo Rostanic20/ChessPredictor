@@ -101,6 +101,14 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     }
 }
 
+val evalProperties = listOf("evalData", "evalOut", "evalVariant", "evalLimit", "evalSkip", "evalEngine")
+    .mapNotNull { key -> findProperty(key)?.let { key to it.toString() } }
+
+tasks.withType<Test>().configureEach {
+    evalProperties.forEach { (key, value) -> systemProperty(key, value) }
+    if (evalProperties.isNotEmpty()) outputs.upToDateWhen { false }
+}
+
 tasks.register<Copy>("copyWebResources") {
     from("src/jsMain/resources")
     into("build/web")

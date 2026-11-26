@@ -58,26 +58,14 @@ class DrawDetectorTest {
 
     @Test
     fun testSameColorBishopsInsufficientMaterial() {
-        val state = fenParser.parseGameState("8/8/8/3k4/8/8/8/2B1KB2 w - - 0 1")
-        val c1Light = ('c'.code + 1) % 2 != 0
-        val f1Light = ('f'.code + 1) % 2 != 0
-        if (c1Light == f1Light) {
-            assertTrue(drawDetector.isInsufficientMaterial(state))
-        } else {
-            assertFalse(drawDetector.isInsufficientMaterial(state))
-        }
+        val lightSquaredPair = fenParser.parseGameState("8/8/8/3k4/8/8/8/1B2KB2 w - - 0 1")
+        assertTrue(drawDetector.isInsufficientMaterial(lightSquaredPair))
     }
 
     @Test
     fun testOppositeColorBishopsNotInsufficientMaterial() {
-        val state = fenParser.parseGameState("8/8/8/3k4/8/8/8/1B2KB2 w - - 0 1")
-        val b1Light = ('b'.code + 1) % 2 != 0
-        val f1Light = ('f'.code + 1) % 2 != 0
-        if (b1Light != f1Light) {
-            assertFalse(drawDetector.isInsufficientMaterial(state))
-        } else {
-            assertTrue(drawDetector.isInsufficientMaterial(state))
-        }
+        val darkAndLight = fenParser.parseGameState("8/8/8/3k4/8/8/8/2B1KB2 w - - 0 1")
+        assertFalse(drawDetector.isInsufficientMaterial(darkAndLight))
     }
 
     @Test

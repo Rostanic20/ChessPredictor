@@ -74,7 +74,7 @@ class ChessRulesEngineIntegrationTest {
     }
 
     @Test
-    fun testEnPassantCapture() {
+    fun testPawnCapturesDiagonally() {
         var state = engine.parseGameState("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1")
         state = makeMoveFromState(state, Square('d', 7), Square('d', 5))!!
         state = makeMoveFromState(state, Square('e', 4), Square('d', 5))!!
@@ -126,11 +126,10 @@ class ChessRulesEngineIntegrationTest {
 
     @Test
     fun testMustEscapeCheck() {
-        val state = engine.parseGameState("4k3/8/8/8/8/8/r7/4K3 w - - 0 1")
-        val allMoves = engine.getLegalMoves(state)
-        for (move in allMoves) {
-            assertEquals(Square('e', 1), move.from, "Only king moves should be legal when in check with no blocks")
-        }
+        val state = engine.parseGameState("4k3/8/8/8/8/8/8/r3K2N w - - 0 1")
+        assertTrue(engine.withStatus(state).isCheck)
+        val moves = engine.getLegalMoves(state).map { "${it.from}${it.to}" }.toSet()
+        assertEquals(setOf("e1d2", "e1e2", "e1f2"), moves, "The knight cannot block or capture, so only the king may move")
     }
 
     @Test
