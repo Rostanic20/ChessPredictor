@@ -8,13 +8,6 @@
     @android.webkit.JavascriptInterface <methods>;
 }
 
-# Keep Compose related classes
--keep class androidx.compose.** { *; }
--dontwarn androidx.compose.**
-
-# Keep Kotlin multiplatform shared module
--keep class com.chesspredictor.shared.** { *; }
-
 # Keep enum values
 -keepclassmembers enum * {
     public static **[] values();
@@ -35,13 +28,6 @@
     public static int d(...);
     public static int e(...);
 }
-
-# Keep kotlinx coroutines
--keep class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
-
-# Keep material design components
--keep class com.google.android.material.** { *; }
 
 # WebView and JavaScript optimizations
 -keepattributes JavascriptInterface
