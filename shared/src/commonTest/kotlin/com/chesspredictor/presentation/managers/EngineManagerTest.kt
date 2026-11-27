@@ -21,8 +21,11 @@ import com.chesspredictor.domain.humanlike.TimeLeft
 import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.domain.repositories.PositionAnalysis
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -42,6 +45,7 @@ class EngineManagerTest {
 
     private class PendingRepository : ChessEngineRepository {
         val replies = mutableListOf<CompletableDeferred<ChessMove?>>()
+        var analyses = 0
 
         override suspend fun analyzeBestMove(board: ChessBoard, settings: EngineSettings): ChessMove? {
             val reply = CompletableDeferred<ChessMove?>()
@@ -49,8 +53,10 @@ class EngineManagerTest {
             return reply.await()
         }
 
-        override suspend fun analyzePosition(board: ChessBoard, settings: EngineSettings) =
-            PositionAnalysis(bestMove = null, evaluation = 0f)
+        override suspend fun analyzePosition(board: ChessBoard, settings: EngineSettings): PositionAnalysis {
+            analyses++
+            return PositionAnalysis(bestMove = null, evaluation = 0f)
+        }
 
         override suspend fun analyzeWithEvaluation(board: ChessBoard, settings: EngineSettings): EngineAnalysis? = null
         override suspend fun validateMove(board: ChessBoard, move: ChessMove) = true
@@ -189,6 +195,23 @@ class EngineManagerTest {
     }
 
     @Test
+    fun aHumanModelOnARealThreadIsNotCutOffByVirtualTime() = runTest {
+        val repository = PendingRepository()
+        val manager = EngineManager(
+            repository, backgroundScope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5")),
+            background = Dispatchers.Default
+        ).also { it.setReady(true) }
+        val chosen = CompletableDeferred<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true)) { chosen.complete(it) }
+        val move = withContext(Dispatchers.Default) { withTimeoutOrNull(10_000) { chosen.await() } }
+
+        assertEquals("c7c5", move?.toUci())
+        assertEquals(0, repository.replies.size)
+    }
+
+    @Test
     fun theHumanModelKeepsPlayingInTimeTrouble() = runTest {
         val repository = PendingRepository()
         val scope = TestScope(StandardTestDispatcher(testScheduler))
@@ -224,7 +247,7 @@ class EngineManagerTest {
         manager.requestEngineMove(board, EngineSettings(humanStyle = true), maxThinkMs = 1_000) { delivered += it }
         advanceTimeBy(1_001)
         repository.replies.single().complete(e5)
-        advanceTimeBy(1_000)
+        advanceTimeBy(2_000)
 
         assertEquals(listOf(e5), delivered)
     }
@@ -262,6 +285,42 @@ class EngineManagerTest {
         manager.requestEngineMove(board, EngineSettings(humanStyle = true, difficulty = EngineDifficulty.CUSTOM)) { delivered += it }
         runCurrent()
         assertEquals(1, repository.replies.size)
+    }
+
+    private class AlwaysFirst : Random() {
+        override fun nextBits(bitCount: Int) = 0
+        override fun nextDouble() = 0.0
+    }
+
+    private fun TestScope.judgeChecksFor(ready: Boolean, maxThinkMs: Long?): Int {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5"), random = AlwaysFirst()),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(ready) }
+        var checksBeforeMove = -1
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true), maxThinkMs = maxThinkMs) {
+            checksBeforeMove = repository.analyses
+        }
+        advanceTimeBy(120_000)
+        return checksBeforeMove
+    }
+
+    @Test
+    fun anUnlikelyHumanMoveIsCheckedByStockfish() = runTest {
+        assertEquals(2, judgeChecksFor(ready = true, maxThinkMs = null))
+    }
+
+    @Test
+    fun theJudgeIsSkippedWhenTheClockIsShort() = runTest {
+        assertEquals(0, judgeChecksFor(ready = true, maxThinkMs = 2_000))
+    }
+
+    @Test
+    fun theJudgeIsSkippedWhileStockfishIsNotReady() = runTest {
+        assertEquals(0, judgeChecksFor(ready = false, maxThinkMs = null))
     }
 
     @Test

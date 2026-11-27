@@ -7,6 +7,7 @@ import com.chesspredictor.domain.humanlike.GamePhase
 import com.chesspredictor.domain.humanlike.HumanThinkTime
 import com.chesspredictor.domain.humanlike.MaiaMoveChooser
 import com.chesspredictor.domain.humanlike.MoveKind
+import com.chesspredictor.domain.humanlike.StockfishJudge
 import com.chesspredictor.domain.humanlike.ThinkCell
 import com.chesspredictor.domain.humanlike.ThinkPace
 import com.chesspredictor.domain.repositories.ChessEngineRepository
@@ -42,9 +43,11 @@ class EngineManager(
         private const val TAG = "EngineManager"
         private const val MIN_SEARCH_MS = 300
         private const val FORCED_MOVE_LIMIT = 5
+        private const val MIN_JUDGE_BUDGET_MS = 3_000L
     }
 
     private val mistakes = StockfishMistakes(repository)
+    private val judge = StockfishJudge(repository)
     private val drawOffers = DrawOfferJudge(repository)
 
     private val _isThinking = MutableStateFlow(false)
@@ -153,10 +156,14 @@ class EngineManager(
         if (!playsWithoutEngine(settings)) return null
         val chooser = moveChooser ?: return null
         val elo = settings.difficulty.eloRating
+        val choose = suspend { withContext(background) { chooser.choose(history, elo, elo, judgeFor(maxThinkMs)) } }
         return try {
-            withTimeoutOrNull(maxThinkMs ?: Long.MAX_VALUE) {
-                withContext(background) { chooser.choose(history, elo, elo) }
-            }.also { if (it == null) ChessLogger.warning(TAG, "Human move model ran out of time, using the engine") }
+            if (maxThinkMs == null) {
+                choose()
+            } else {
+                withTimeoutOrNull(maxThinkMs) { choose() }
+                    ?: null.also { ChessLogger.warning(TAG, "Human move model ran out of time, using the engine") }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -164,6 +171,9 @@ class EngineManager(
             null
         }
     }
+
+    private fun judgeFor(maxThinkMs: Long?) =
+        judge.takeIf { _isReady.value && (maxThinkMs ?: Long.MAX_VALUE) >= MIN_JUDGE_BUDGET_MS }
 
     private suspend fun engineMove(board: ChessBoard, settings: EngineSettings, searchSettings: EngineSettings): ChessMove? {
         if (!_isReady.value) {

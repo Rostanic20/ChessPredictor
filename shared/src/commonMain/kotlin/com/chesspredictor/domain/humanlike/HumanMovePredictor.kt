@@ -7,9 +7,9 @@ fun interface HumanMovePredictor {
 }
 
 object MaiaPolicy {
-    fun distribution(logits: FloatArray, legalUci: List<String>, blackToMove: Boolean, temperature: Double = 1.0): Map<String, Double> {
+    fun distribution(logits: FloatArray, legalUci: List<String>, blackToMove: Boolean): Map<String, Double> {
         if (legalUci.isEmpty()) return emptyMap()
-        val scores = legalUci.associateWith { logits[MaiaEncoding.moveIndex(it, blackToMove)] / temperature }
+        val scores = legalUci.associateWith { logits[MaiaEncoding.moveIndex(it, blackToMove)].toDouble() }
         val top = scores.values.max()
         val weights = scores.mapValues { exp(it.value - top) }
         val total = weights.values.sum()

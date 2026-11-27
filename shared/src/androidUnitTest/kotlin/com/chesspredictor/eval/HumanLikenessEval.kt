@@ -7,6 +7,7 @@ import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.GameState
+import com.chesspredictor.domain.humanlike.HumanMovePredictor
 import com.chesspredictor.domain.humanlike.MaiaMoveChooser
 import com.chesspredictor.domain.humanlike.MaiaNetwork
 import com.chesspredictor.domain.humanlike.MaiaWeights
@@ -26,6 +27,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assume.assumeTrue
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.hours
 
@@ -77,9 +79,13 @@ class HumanLikenessEval {
 
         NodeStockfish(script, File("${out.path}.engine.log")).use { engine ->
             engine.initialize()
+            val maiaAnswers = AtomicInteger()
             val maia = if (variant == "maia") {
                 val weights = requireNotNull(System.getProperty("maiaWeights")) { "the maia variant needs -PmaiaWeights" }
-                MaiaMoveChooser(MaiaNetwork(MaiaWeights.parse(File(weights).readBytes())))
+                val network = MaiaNetwork(MaiaWeights.parse(File(weights).readBytes()))
+                MaiaMoveChooser(HumanMovePredictor { fens, selfElo, oppoElo ->
+                    network.logits(fens, selfElo, oppoElo).also { maiaAnswers.incrementAndGet() }
+                })
             } else {
                 null
             }
@@ -98,6 +104,7 @@ class HumanLikenessEval {
                     val state = stateAfter(position)
                     val settings = settingsFor(position.band, variant)
                     val chosen = CompletableDeferred<ChessMove?>()
+                    val answersBefore = maiaAnswers.get()
                     manager.requestEngineMove(toBoard(state), settings, history = state.positionHistory + state.toFen()) {
                         chosen.complete(it)
                     }
@@ -121,6 +128,9 @@ class HumanLikenessEval {
                     }
                     consecutiveFailures = 0
 
+                    check(maia == null || maiaAnswers.get() > answersBefore) {
+                        "Maia gave no answer at ${position.game} ply ${position.ply}; the engine played instead"
+                    }
                     val engineUci = move.toUci()
                     val result = Result(position.game, position.ply, position.band, variant, position.human, engineUci, engineUci == position.human)
                     writer.write(json.encodeToString(result))
