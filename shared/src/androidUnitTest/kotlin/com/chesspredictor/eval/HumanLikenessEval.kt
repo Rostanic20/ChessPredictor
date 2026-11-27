@@ -7,6 +7,9 @@ import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.GameState
+import com.chesspredictor.domain.humanlike.MaiaMoveChooser
+import com.chesspredictor.domain.humanlike.MaiaNetwork
+import com.chesspredictor.domain.humanlike.MaiaWeights
 import com.chesspredictor.domain.usecases.ChessRulesEngine
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.presentation.managers.EngineManager
@@ -74,20 +77,30 @@ class HumanLikenessEval {
 
         NodeStockfish(script, File("${out.path}.engine.log")).use { engine ->
             engine.initialize()
+            val maia = if (variant == "maia") {
+                val weights = requireNotNull(System.getProperty("maiaWeights")) { "the maia variant needs -PmaiaWeights" }
+                MaiaMoveChooser(MaiaNetwork(MaiaWeights.parse(File(weights).readBytes())))
+            } else {
+                null
+            }
             val manager = EngineManager(
                 ChessEngineRepositoryImpl(engine, parser),
                 backgroundScope,
-                HumanBehaviorManager(backgroundScope)
+                HumanBehaviorManager(backgroundScope),
+                moveChooser = maia,
+                background = Dispatchers.Default
             )
             manager.setReady(true)
 
             out.bufferedWriter().use { writer ->
                 var consecutiveFailures = 0
                 positions.forEachIndexed { index, position ->
-                    val board = boardAfter(position)
+                    val state = stateAfter(position)
                     val settings = settingsFor(position.band, variant)
                     val chosen = CompletableDeferred<ChessMove?>()
-                    manager.requestEngineMove(board, settings) { chosen.complete(it) }
+                    manager.requestEngineMove(toBoard(state), settings, history = state.positionHistory + state.toFen()) {
+                        chosen.complete(it)
+                    }
                     val watchdog = CoroutineScope(Dispatchers.Default).launch {
                         delay(60_000)
                         failures.appendText(
@@ -120,7 +133,7 @@ class HumanLikenessEval {
         println(summary(out))
     }
 
-    private fun boardAfter(position: Position): ChessBoard {
+    private fun stateAfter(position: Position): GameState {
         var state = rules.parseGameState(ChessConstants.STARTING_POSITION_FEN)
         for (uci in position.moves) {
             val move = requireNotNull(parser.parseUciMove(uci, toBoard(state))) { "unparsable $uci in ${position.game}" }
@@ -129,7 +142,7 @@ class HumanLikenessEval {
         check(state.toFen().split(" ").take(3) == position.fen.split(" ").take(3)) {
             "replay of ${position.game} reached ${state.toFen()} instead of ${position.fen}"
         }
-        return toBoard(state)
+        return state
     }
 
     private fun toBoard(state: GameState) = ChessBoard(
@@ -150,7 +163,7 @@ class HumanLikenessEval {
         }
         val settings = EngineSettings().withDifficulty(difficulty)
         return when (variant) {
-            "app" -> settings
+            "app", "maia" -> settings
             "plain" -> settings.copy(humanStyle = false)
             else -> error("unknown variant $variant")
         }
