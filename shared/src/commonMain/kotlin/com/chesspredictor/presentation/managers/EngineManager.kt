@@ -146,7 +146,7 @@ class EngineManager(
                     settings.copy(timeLimit = minOf(settings.timeLimit, maxOf(it.toInt(), MIN_SEARCH_MS)))
                 } ?: settings
 
-                val humanMove = if (context != null) chooseHumanMove(history, settings) else null
+                val humanMove = if (settings.humanStyle) chooseHumanMove(history, settings) else null
                 val finalMove = humanMove ?: repository.analyzeBestMove(board, searchSettings)?.let { move ->
                     if (settings.humanStyle) applyHumanMistakes(move, board, searchSettings) else move
                 }

@@ -187,6 +187,24 @@ class EngineManagerTest {
     }
 
     @Test
+    fun theHumanModelKeepsPlayingInTimeTrouble() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5")),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(true) }
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true, timeLimit = 100)) { delivered += it }
+        advanceTimeBy(1_000)
+
+        assertEquals(listOf("c7c5"), delivered.map { it.toUci() })
+        assertEquals(0, repository.replies.size)
+    }
+
+    @Test
     fun aFailingHumanModelFallsBackToStockfish() = runTest {
         val repository = PendingRepository()
         val scope = TestScope(StandardTestDispatcher(testScheduler))
