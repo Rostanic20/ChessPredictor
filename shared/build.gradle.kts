@@ -63,6 +63,7 @@ kotlin {
                 implementation(kotlin("test-junit"))
                 implementation("junit:junit:4.13.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+                implementation("com.microsoft.onnxruntime:onnxruntime:1.32.0")
             }
         }
         val jsMain by getting {
@@ -101,7 +102,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     }
 }
 
-val evalProperties = listOf("evalData", "evalOut", "evalVariant", "evalLimit", "evalSkip", "evalEngine")
+val evalProperties = listOf("evalData", "evalOut", "evalVariant", "evalLimit", "evalSkip", "evalEngine", "maiaReference", "maiaModel")
     .mapNotNull { key -> findProperty(key)?.let { key to it.toString() } }
 
 tasks.withType<Test>().configureEach {
