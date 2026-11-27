@@ -152,12 +152,6 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         if (isInitialized) session.setPosition(fen)
     }
 
-    private fun strengthCommands(strength: EngineStrength, settings: EngineSettings): List<String> = listOfNotNull(
-        "setoption name UCI_LimitStrength value ${strength.limitStrength}",
-        strength.elo?.let { "setoption name UCI_Elo value $it" },
-        "setoption name Skill Level value ${strength.skillLevel}",
-        "setoption name MultiPV value ${settings.multiPV}"
-    )
 
     override suspend fun analyze(settings: EngineSettings): EngineAnalysis {
         if (!isInitialized) {
@@ -173,11 +167,6 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         }
         
         val strength = EngineStrength.of(settings)
-        val goCommand = buildString {
-            append("go depth ${strength.depth}")
-            if (settings.timeLimit > 0) append(" movetime ${settings.timeLimit.coerceIn(300, 5000)}")
-            if (settings.timeLimit < 100) append(" nodes 100000")
-        }
 
         var evaluation = 0f
         var depth = 0
@@ -189,7 +178,7 @@ actual class StockfishDataSource(private val context: Context) : ChessEngineData
         val alternativeMoves = mutableListOf<String>()
 
         val timeout = maxOf(settings.timeLimit + 2000L, 5000L)
-        val bestMoveLine = session.search(strengthCommands(strength, settings), goCommand, timeout) { line ->
+        val bestMoveLine = session.search(strength.setupCommands(settings.multiPV), strength.goCommand(settings.timeLimit), timeout) { line ->
             if (!line.contains(" depth ")) return@search
             DEPTH.find(line)?.let { depth = maxOf(depth, it.groupValues[1].toInt()) }
             val mateScore = MATE.find(line)

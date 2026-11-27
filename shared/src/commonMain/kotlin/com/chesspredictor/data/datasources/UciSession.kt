@@ -16,8 +16,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
-class UciSession(private val send: suspend (String) -> Unit) {
+class UciSession(
+    private val send: suspend (String) -> Unit,
+    private val clock: CoroutineContext = EmptyCoroutineContext
+) {
     private val lines = MutableSharedFlow<String>(extraBufferCapacity = 1024, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val searchesFinished = MutableStateFlow(0)
     private val exclusive = Mutex()
@@ -50,20 +55,22 @@ class UciSession(private val send: suspend (String) -> Unit) {
                     searchesStarted++
                     send(go)
                 }
-                withTimeoutOrNull(timeoutMs) { bestmove.await() }.also { if (it == null) bestmove.cancel() }
+                withContext(clock) { withTimeoutOrNull(timeoutMs) { bestmove.await() } }.also { if (it == null) bestmove.cancel() }
             }
         }
 
     private suspend fun settle() {
         if (searchesFinished.value < searchesStarted) {
             send("stop")
-            val stopped = withTimeoutOrNull(STOP_TIMEOUT_MS) { searchesFinished.first { it >= searchesStarted } }
+            val stopped = withContext(clock) {
+                withTimeoutOrNull(STOP_TIMEOUT_MS) { searchesFinished.first { it >= searchesStarted } }
+            }
             if (stopped == null) searchesFinished.value = searchesStarted
         }
         coroutineScope {
             val ready = async(start = CoroutineStart.UNDISPATCHED) { lines.first { it == "readyok" } }
             send("isready")
-            withTimeoutOrNull(READY_TIMEOUT_MS) { ready.await() } ?: ready.cancel()
+            withContext(clock) { withTimeoutOrNull(READY_TIMEOUT_MS) { ready.await() } } ?: ready.cancel()
         }
     }
 

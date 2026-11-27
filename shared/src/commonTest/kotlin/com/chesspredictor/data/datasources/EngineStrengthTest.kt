@@ -37,6 +37,27 @@ class EngineStrengthTest {
     }
 
     @Test
+    fun uciCommandsMatchTheStrength() {
+        val limited = EngineStrength(limitStrength = true, elo = 1600, skillLevel = 20, depth = 14)
+        assertEquals(
+            listOf(
+                "setoption name UCI_LimitStrength value true",
+                "setoption name UCI_Elo value 1600",
+                "setoption name Skill Level value 20",
+                "setoption name MultiPV value 1"
+            ),
+            limited.setupCommands(multiPV = 1)
+        )
+        val unlimited = EngineStrength(limitStrength = false, elo = null, skillLevel = 0, depth = 3)
+        assertFalse(unlimited.setupCommands(multiPV = 1).any { "UCI_Elo" in it })
+
+        assertEquals("go depth 14 movetime 300", limited.goCommand(150))
+        assertEquals("go depth 14 movetime 5000", limited.goCommand(9_000))
+        assertEquals("go depth 14 movetime 300 nodes 100000", limited.goCommand(50))
+        assertEquals("go depth 14", limited.goCommand(0).substringBefore(" nodes"))
+    }
+
+    @Test
     fun weakerRequestsLowerTheTargetElo() {
         val settings = EngineSettings(difficulty = EngineDifficulty.EXPERT)
         val weaker = EngineStrength.of(settings.copy(skillLevel = settings.skillLevel - 3))

@@ -54,6 +54,7 @@ class HumanLikenessEval {
     )
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val maxConsecutiveFailures = 5
     private val rules = ChessRulesEngine()
     private val parser = MoveParserImpl()
 
@@ -82,6 +83,7 @@ class HumanLikenessEval {
             manager.setReady(true)
 
             out.bufferedWriter().use { writer ->
+                var consecutiveFailures = 0
                 positions.forEachIndexed { index, position ->
                     val board = boardAfter(position)
                     val settings = settingsFor(position.band, variant)
@@ -98,7 +100,14 @@ class HumanLikenessEval {
                     val move = chosen.await()
                     watchdog.cancel()
                     manager.cancelPendingMove()
-                    if (move == null) return@forEachIndexed
+                    if (move == null) {
+                        consecutiveFailures++
+                        check(consecutiveFailures < maxConsecutiveFailures) {
+                            "$consecutiveFailures positions in a row got no move; see ${failures.path}"
+                        }
+                        return@forEachIndexed
+                    }
+                    consecutiveFailures = 0
 
                     val engineUci = uci(move)
                     val result = Result(position.game, position.ply, position.band, variant, position.human, engineUci, engineUci == position.human)

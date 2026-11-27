@@ -9,6 +9,19 @@ data class EngineStrength(
     val skillLevel: Int,
     val depth: Int
 ) {
+    fun setupCommands(multiPV: Int): List<String> = listOfNotNull(
+        "setoption name UCI_LimitStrength value $limitStrength",
+        elo?.let { "setoption name UCI_Elo value $it" },
+        "setoption name Skill Level value $skillLevel",
+        "setoption name MultiPV value $multiPV"
+    )
+
+    fun goCommand(timeLimitMs: Int): String = buildString {
+        append("go depth $depth")
+        if (timeLimitMs > 0) append(" movetime ${timeLimitMs.coerceIn(300, 5000)}")
+        if (timeLimitMs < 100) append(" nodes 100000")
+    }
+
     companion object {
         const val MIN_UCI_ELO = 1320
         const val MAX_UCI_ELO = 3190
