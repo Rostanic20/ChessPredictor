@@ -1,5 +1,7 @@
 package com.chesspredictor.domain.humanlike
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.sqrt
@@ -44,15 +46,18 @@ class MaiaWeights private constructor(private val tensors: Map<String, FloatArra
 class LazyMaiaNetwork(load: () -> ByteArray) : HumanMovePredictor {
     private val network by lazy { MaiaNetwork(MaiaWeights.parse(load())) }
 
-    override fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray = network.logits(fens, selfElo, oppoElo)
+    override suspend fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray = network.logits(fens, selfElo, oppoElo)
 }
 
 class MaiaNetwork(private val weights: MaiaWeights) : HumanMovePredictor {
 
-    override fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray {
+    override suspend fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray {
         val tokens = MaiaEncoding.tokens(fens)
         var x = embed(tokens, selfElo, oppoElo)
-        for (block in 0 until BLOCKS) x = block(x, "transformer.layers.$block.")
+        for (block in 0 until BLOCKS) {
+            currentCoroutineContext().ensureActive()
+            x = block(x, "transformer.layers.$block.")
+        }
         x = layerNorm(x, SQUARES, DIM, weights["transformer.norm.weight"], weights["transformer.norm.bias"])
         return policy(x)
     }

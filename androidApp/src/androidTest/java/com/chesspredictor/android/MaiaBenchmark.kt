@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.chesspredictor.domain.humanlike.MaiaNetwork
 import com.chesspredictor.domain.humanlike.MaiaWeights
+import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -12,7 +13,7 @@ import org.junit.runner.RunWith
 class MaiaBenchmark {
 
     @Test
-    fun timeTheKotlinNetwork() {
+    fun timeTheKotlinNetwork() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val loadStarted = System.nanoTime()
         val network = MaiaNetwork(MaiaWeights.parse(context.assets.open("maia3-5m.f16.bin").use { it.readBytes() }))

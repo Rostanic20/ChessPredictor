@@ -53,7 +53,9 @@ enum class EngineDifficulty(
     MASTER("Master (2200 ELO)", 2200, 15, 20, 2600, 0.01f, 0.04f, "Master strength"),
     MAXIMUM("Maximum (2400+ ELO)", 2400, 18, 22, 3000, 0.005f, 0.02f, "Near maximum engine strength"),
     CUSTOM("Custom", 1500, 10, 12, 1500, 0.05f, 0.15f, "Configure your own settings");
-    
+
+    val playsLikeHuman: Boolean get() = this != MAXIMUM && this != CUSTOM
+
     fun getDefaultBehaviorProfile(): HumanBehaviorProfile {
         return when (this) {
             NOVICE, BEGINNER -> HumanBehaviorProfile.BEGINNER_ENTHUSIAST

@@ -9,7 +9,7 @@ class MaiaMoveChooser(
     private val rules: ChessRulesEngine = ChessRulesEngine(),
     private val random: Random = Random.Default
 ) {
-    fun choose(history: List<String>, selfElo: Int, oppoElo: Int, temperature: Double = 1.0): ChessMove? {
+    suspend fun choose(history: List<String>, selfElo: Int, oppoElo: Int, temperature: Double = 1.0): ChessMove? {
         val fen = history.last()
         val legal = rules.getLegalMoves(rules.parseGameState(fen)).associateBy { it.toUci() }
         if (legal.isEmpty()) return null

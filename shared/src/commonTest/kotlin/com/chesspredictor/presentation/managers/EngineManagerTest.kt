@@ -6,6 +6,7 @@ import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.EngineAnalysis
+import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.humanlike.GamePhase
@@ -21,6 +22,7 @@ import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.domain.repositories.PositionAnalysis
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -202,6 +204,64 @@ class EngineManagerTest {
 
         assertEquals(listOf("c7c5"), delivered.map { it.toUci() })
         assertEquals(0, repository.replies.size)
+    }
+
+    @Test
+    fun aSlowHumanModelGivesWayToStockfishWhenTheClockIsShort() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val slow = HumanMovePredictor { fens, elo, oppo ->
+            delay(5_000)
+            favouring("c7c5").logits(fens, elo, oppo)
+        }
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(slow),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(true) }
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true), maxThinkMs = 1_000) { delivered += it }
+        advanceTimeBy(1_001)
+        repository.replies.single().complete(e5)
+        advanceTimeBy(1_000)
+
+        assertEquals(listOf(e5), delivered)
+    }
+
+    @Test
+    fun theHumanModelPlaysBeforeStockfishIsReady() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5")),
+            background = StandardTestDispatcher(testScheduler)
+        )
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true)) { delivered += it }
+        advanceTimeBy(120_000)
+
+        assertEquals(listOf("c7c5"), delivered.map { it.toUci() })
+        assertEquals(0, repository.replies.size)
+        assertNull(manager.error.value)
+    }
+
+    @Test
+    fun customSettingsArePlayedByStockfish() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5")),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(true) }
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true, difficulty = EngineDifficulty.CUSTOM)) { delivered += it }
+        runCurrent()
+        assertEquals(1, repository.replies.size)
     }
 
     @Test

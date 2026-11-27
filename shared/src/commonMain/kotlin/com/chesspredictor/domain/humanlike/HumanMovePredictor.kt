@@ -3,7 +3,7 @@ package com.chesspredictor.domain.humanlike
 import kotlin.math.exp
 
 fun interface HumanMovePredictor {
-    fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray
+    suspend fun logits(fens: List<String>, selfElo: Int, oppoElo: Int): FloatArray
 }
 
 object MaiaPolicy {

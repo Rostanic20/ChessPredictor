@@ -15,6 +15,7 @@ import java.io.File
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import kotlin.test.Test
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -39,10 +40,10 @@ class MaiaParityTest {
         val referencePath = System.getProperty("maiaReference")
         val modelPath = System.getProperty("maiaModel")
         assumeTrue("set -PmaiaReference and -PmaiaModel to run", referencePath != null && modelPath != null)
-        val references = File(referencePath).readLines().filter { it.isNotBlank() }.map { json.decodeFromString<Reference>(it) }
+        val references = File(referencePath!!).readLines().filter { it.isNotBlank() }.map { json.decodeFromString<Reference>(it) }
 
         val environment = OrtEnvironment.getEnvironment()
-        environment.createSession(File(modelPath).readBytes(), OrtSession.SessionOptions()).use { session ->
+        environment.createSession(File(modelPath!!).readBytes(), OrtSession.SessionOptions()).use { session ->
             var tokensChecked = 0
             var agree = 0
             var humanHits = 0
@@ -67,16 +68,16 @@ class MaiaParityTest {
     }
 
     @Test
-    fun kotlinNetworkMatchesTheOnnxModel() {
+    fun kotlinNetworkMatchesTheOnnxModel() = runBlocking {
         val referencePath = System.getProperty("maiaReference")
         val modelPath = System.getProperty("maiaModel")
         val weightsPath = System.getProperty("maiaWeights")
         assumeTrue("set -PmaiaReference, -PmaiaModel and -PmaiaWeights to run", referencePath != null && modelPath != null && weightsPath != null)
-        val references = File(referencePath).readLines().filter { it.isNotBlank() }.map { json.decodeFromString<Reference>(it) }
-        val network = MaiaNetwork(MaiaWeights.parse(File(weightsPath).readBytes()))
+        val references = File(referencePath!!).readLines().filter { it.isNotBlank() }.map { json.decodeFromString<Reference>(it) }
+        val network = MaiaNetwork(MaiaWeights.parse(File(weightsPath!!).readBytes()))
 
         val environment = OrtEnvironment.getEnvironment()
-        environment.createSession(File(modelPath).readBytes(), OrtSession.SessionOptions()).use { session ->
+        environment.createSession(File(modelPath!!).readBytes(), OrtSession.SessionOptions()).use { session ->
             var agree = 0
             var humanHits = 0
             var worstGap = 0f

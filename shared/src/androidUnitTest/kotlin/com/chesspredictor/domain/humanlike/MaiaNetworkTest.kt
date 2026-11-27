@@ -1,6 +1,7 @@
 package com.chesspredictor.domain.humanlike
 
 import com.chesspredictor.domain.usecases.ChessRulesEngine
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,7 +68,7 @@ class MaiaNetworkTest {
     )
 
     @Test
-    fun theBundledWeightsPickTheSameMovesAsThePythonModel() {
+    fun theBundledWeightsPickTheSameMovesAsThePythonModel() = runBlocking {
         val network = MaiaNetwork(MaiaWeights.parse(File("../androidApp/src/main/assets/maia3-5m.f16.bin").readBytes()))
         val rules = ChessRulesEngine()
         val picked = cases.map { case ->

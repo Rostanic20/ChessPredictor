@@ -36,6 +36,7 @@ import com.chesspredictor.presentation.managers.SettingsManager
 import com.chesspredictor.presentation.ErrorStateManager
 import com.chesspredictor.presentation.ChessError
 import com.chesspredictor.utils.ChessLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -141,16 +142,26 @@ class ChessBoardViewModel(
         try {
             appModule.initializeEngine()
             engineManager.setReady(true)
-            if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
-                getEngineMove()
-            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             engineManager.setReady(false)
             errorManager.reportError(ChessError.EngineInitError(
                 message = "Failed to start engine: ${e.message}"
             ))
+            if (engineManager.playsWithoutEngine(settingsManager.engineSettings.value) && botMovesNow()) {
+                requestEngineMoveInternal()
+            }
+            return
+        }
+        if (settingsManager.shouldBotMove(gameStateManager.currentTurn.value)) {
+            getEngineMove()
         }
     }
+
+    private fun botMovesNow(): Boolean =
+        settingsManager.shouldBotMove(gameStateManager.currentTurn.value) &&
+            !engineManager.isThinking.value && !gameStateManager.isGameOver()
 
     private fun refreshOpening(history: List<DetailedMove>) {
         openingJob?.cancel()
@@ -322,7 +333,7 @@ class ChessBoardViewModel(
 
         if (!engineManager.isReady.value) {
             viewModelScope.launch {
-                if (initEngineWithRetry()) {
+                if (initEngineWithRetry() || engineManager.playsWithoutEngine(settingsManager.engineSettings.value)) {
                     requestEngineMoveInternal()
                 }
             }
