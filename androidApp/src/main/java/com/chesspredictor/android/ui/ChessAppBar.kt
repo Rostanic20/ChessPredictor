@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -40,7 +41,8 @@ internal fun ChessAppBar(
     onNewGame: () -> Unit,
     onUndo: () -> Unit,
     onImport: () -> Unit = {},
-    onExport: () -> Unit = {}
+    onExport: () -> Unit = {},
+    onAbout: () -> Unit = {}
 ) {
     TopAppBar(
         title = {},
@@ -115,6 +117,23 @@ internal fun ChessAppBar(
                         onClick = {
                             showMenu = false
                             onExport()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Row {
+                                Icon(
+                                    Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("About")
+                            }
+                        },
+                        onClick = {
+                            showMenu = false
+                            onAbout()
                         }
                     )
                 }

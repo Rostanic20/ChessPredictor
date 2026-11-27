@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
+import com.chesspredictor.android.ui.components.AboutDialog
 import com.chesspredictor.android.ui.components.DrawOfferDialog
 import com.chesspredictor.android.ui.components.ExportGameDialog
 import com.chesspredictor.android.ui.components.ImportGameDialog
@@ -37,6 +38,7 @@ fun ChessBoardScreen(
 
     var showImportDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var pendingPromotion by remember { mutableStateOf<Pair<Square, Square>?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -91,6 +93,10 @@ fun ChessBoardScreen(
         )
     }
 
+    if (showAbout) {
+        AboutDialog(onDismiss = { showAbout = false })
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -102,7 +108,8 @@ fun ChessBoardScreen(
                 onNewGame = viewModel::onNewGame,
                 onUndo = viewModel::undoLastMove,
                 onImport = { showImportDialog = true },
-                onExport = { showExportDialog = true }
+                onExport = { showExportDialog = true },
+                onAbout = { showAbout = true }
             )
         }
     ) { paddingValues ->
