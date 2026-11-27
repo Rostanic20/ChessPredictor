@@ -13,6 +13,8 @@ import com.chesspredictor.domain.entities.MoveCommentary
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TimeControl
+import com.chesspredictor.domain.humanlike.HumanMovePredictor
+import com.chesspredictor.domain.humanlike.MaiaMoveChooser
 import com.chesspredictor.domain.humanlike.ThinkPace
 import com.chesspredictor.data.repositories.GameStateRepository
 import com.chesspredictor.domain.usecases.ChessRulesEngine
@@ -55,14 +57,22 @@ class ChessBoardViewModel(
     private val chessRulesEngine: ChessRulesEngine = ChessRulesEngine(),
     private val openingDetector: OpeningDetector = OpeningDetector(),
     private val importExportGameUseCase: ImportExportGameUseCase = ImportExportGameUseCase(),
-    private val background: CoroutineDispatcher = Dispatchers.Default
+    private val background: CoroutineDispatcher = Dispatchers.Default,
+    humanMoves: HumanMovePredictor? = null
 ) {
     private val appModule: AppModule = providedAppModule ?: getOrCreateAppModule()
     private val viewModelScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val animationManager = AnimationManager()
     private val humanBehaviorManager = HumanBehaviorManager(viewModelScope)
-    private val engineManager = EngineManager(appModule.chessEngineRepository, viewModelScope, humanBehaviorManager)
+    private val engineManager = EngineManager(
+        repository = appModule.chessEngineRepository,
+        scope = viewModelScope,
+        humanBehaviorManager = humanBehaviorManager,
+        rules = chessRulesEngine,
+        moveChooser = humanMoves?.let { MaiaMoveChooser(it, chessRulesEngine) },
+        background = background
+    )
     private val errorManager = ErrorStateManager()
 
     private val gameStateManager = GameStateManager(chessRulesEngine)
@@ -334,7 +344,8 @@ class ChessBoardViewModel(
             board = board,
             settings = settings,
             maxThinkMs = timeControl?.let { remaining / 3 },
-            pace = timeControl?.let { ThinkPace.of(it.initialTime, it.increment, remaining) } ?: ThinkPace.CASUAL
+            pace = timeControl?.let { ThinkPace.of(it.initialTime, it.increment, remaining) } ?: ThinkPace.CASUAL,
+            history = gameStateManager.currentGameState?.let { it.positionHistory + it.toFen() } ?: listOf(board.fen)
         ) { move ->
             if (gameStateManager.board.value.fen != board.fen) return@requestEngineMove
             executeMove(move.from, move.to, move.promotion)

@@ -6,7 +6,9 @@ import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.EngineAnalysis
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.humanlike.GamePhase
+import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.humanlike.HumanThinkTime
+import com.chesspredictor.domain.humanlike.MaiaMoveChooser
 import com.chesspredictor.domain.humanlike.MoveKind
 import com.chesspredictor.domain.humanlike.ThinkCell
 import com.chesspredictor.domain.humanlike.ThinkPace
@@ -15,8 +17,10 @@ import com.chesspredictor.domain.usecases.ChessRulesEngine
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.utils.ChessLogger
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.random.Random
 import kotlin.time.TimeSource
@@ -34,7 +39,9 @@ class EngineManager(
     private val scope: CoroutineScope,
     private val humanBehaviorManager: HumanBehaviorManager? = null,
     private val thinkTime: HumanThinkTime = HumanThinkTime(),
-    private val rules: ChessRulesEngine = ChessRulesEngine()
+    private val rules: ChessRulesEngine = ChessRulesEngine(),
+    private val moveChooser: MaiaMoveChooser? = null,
+    private val background: CoroutineDispatcher = Dispatchers.Default
 ) {
     companion object {
         private const val TAG = "EngineManager"
@@ -108,6 +115,7 @@ class EngineManager(
         settings: EngineSettings,
         maxThinkMs: Long? = null,
         pace: ThinkPace = ThinkPace.CASUAL,
+        history: List<String> = listOf(board.fen),
         onMoveReady: (ChessMove) -> Unit
     ) {
         moveJob?.cancel()
@@ -138,14 +146,11 @@ class EngineManager(
                     settings.copy(timeLimit = minOf(settings.timeLimit, maxOf(it.toInt(), MIN_SEARCH_MS)))
                 } ?: settings
 
-                val move = repository.analyzeBestMove(board, searchSettings)
-                if (move != null) {
-                    val finalMove = if (settings.humanStyle) {
-                        applyHumanMistakes(move, board, searchSettings)
-                    } else {
-                        move
-                    }
-
+                val humanMove = if (context != null) chooseHumanMove(history, settings) else null
+                val finalMove = humanMove ?: repository.analyzeBestMove(board, searchSettings)?.let { move ->
+                    if (settings.humanStyle) applyHumanMistakes(move, board, searchSettings) else move
+                }
+                if (finalMove != null) {
                     if (context != null) {
                         val kind = context.kindOf(finalMove)
                         if (kind != context.expectedKind) targetMs = sampleThink(context, kind, pace, maxThinkMs)
@@ -182,6 +187,20 @@ class EngineManager(
     
     fun clearError() {
         _error.value = null
+    }
+
+    private suspend fun chooseHumanMove(history: List<String>, settings: EngineSettings): ChessMove? {
+        val chooser = moveChooser ?: return null
+        if (settings.difficulty == EngineDifficulty.MAXIMUM) return null
+        val elo = settings.difficulty.eloRating
+        return try {
+            withContext(background) { chooser.choose(history, elo, elo) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ChessLogger.warning(TAG, "Human move model failed, falling back to the engine: ${e.message}")
+            null
+        }
     }
 
     private fun sampleThink(context: MoveContext, kind: MoveKind, pace: ThinkPace, maxThinkMs: Long?): Long =

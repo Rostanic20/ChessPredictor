@@ -21,6 +21,7 @@ private class Credit(val name: String, val licence: String, val detail: String)
 private val credits = listOf(
     Credit("ChessPredictor", "GNU AGPL-3.0", "Free software: you may use, study, share and change it under the same licence."),
     Credit("Stockfish 17.1", "GNU GPL-3.0", "The Stockfish developers, stockfishchess.org, in the stockfish.js build."),
+    Credit("Maia-3 (5M)", "GNU AGPL-3.0", "Human move model by the Computational Social Science Lab, University of Toronto, maiachess.com."),
     Credit("Think times", "Lichess open database, CC0", "Human thinking times learned from public Lichess games.")
 )
 

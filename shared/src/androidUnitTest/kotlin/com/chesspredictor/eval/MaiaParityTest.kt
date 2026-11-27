@@ -3,9 +3,10 @@ package com.chesspredictor.eval
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.humanlike.MaiaEncoding
+import com.chesspredictor.domain.humanlike.MaiaNetwork
 import com.chesspredictor.domain.humanlike.MaiaPolicy
+import com.chesspredictor.domain.humanlike.MaiaWeights
 import com.chesspredictor.domain.usecases.ChessRulesEngine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -15,6 +16,7 @@ import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MaiaParityTest {
 
@@ -53,15 +55,7 @@ class MaiaParityTest {
                 }
                 val fen = reference.fens.last()
                 val blackToMove = MaiaEncoding.blackToMove(fen)
-                val legal = rules.getLegalMoves(rules.parseGameState(fen)).map { move ->
-                    "${move.from}${move.to}" + when (move.promotion) {
-                        is ChessPiece.Queen -> "q"
-                        is ChessPiece.Rook -> "r"
-                        is ChessPiece.Bishop -> "b"
-                        is ChessPiece.Knight -> "n"
-                        else -> ""
-                    }
-                }
+                val legal = rules.getLegalMoves(rules.parseGameState(fen)).map { it.toUci() }
                 val logits = run(environment, session, tokens, reference.selfElo, reference.oppoElo)
                 val best = MaiaPolicy.distribution(logits, legal, blackToMove).maxBy { it.value }.key
                 if (best == reference.best) agree++
@@ -69,6 +63,46 @@ class MaiaParityTest {
             }
             println("tokens identical for $tokensChecked positions; same move as Python on $agree/${references.size}; human move on $humanHits")
             assertEquals(references.size, agree, "Kotlin must choose the Python move everywhere with the fp32 model")
+        }
+    }
+
+    @Test
+    fun kotlinNetworkMatchesTheOnnxModel() {
+        val referencePath = System.getProperty("maiaReference")
+        val modelPath = System.getProperty("maiaModel")
+        val weightsPath = System.getProperty("maiaWeights")
+        assumeTrue("set -PmaiaReference, -PmaiaModel and -PmaiaWeights to run", referencePath != null && modelPath != null && weightsPath != null)
+        val references = File(referencePath).readLines().filter { it.isNotBlank() }.map { json.decodeFromString<Reference>(it) }
+        val network = MaiaNetwork(MaiaWeights.parse(File(weightsPath).readBytes()))
+
+        val environment = OrtEnvironment.getEnvironment()
+        environment.createSession(File(modelPath).readBytes(), OrtSession.SessionOptions()).use { session ->
+            var agree = 0
+            var humanHits = 0
+            var worstGap = 0f
+            var nanos = 0L
+            references.forEach { reference ->
+                val fen = reference.fens.last()
+                val legal = rules.getLegalMoves(rules.parseGameState(fen)).map { it.toUci() }
+                val blackToMove = MaiaEncoding.blackToMove(fen)
+                val started = System.nanoTime()
+                val kotlinLogits = network.logits(reference.fens, reference.selfElo, reference.oppoElo)
+                nanos += System.nanoTime() - started
+                val onnxLogits = run(environment, session, MaiaEncoding.tokens(reference.fens), reference.selfElo, reference.oppoElo)
+                legal.forEach { uci ->
+                    val index = MaiaEncoding.moveIndex(uci, blackToMove)
+                    worstGap = maxOf(worstGap, kotlin.math.abs(kotlinLogits[index] - onnxLogits[index]))
+                }
+                val best = MaiaPolicy.distribution(kotlinLogits, legal, blackToMove).maxBy { it.value }.key
+                if (best == reference.best) agree++
+                if (best == reference.human) humanHits++
+            }
+            println(
+                "kotlin network: same move as Python on $agree/${references.size}, human move on $humanHits, " +
+                    "largest legal-move logit gap $worstGap, ${nanos / references.size / 1_000_000} ms per move"
+            )
+            assertTrue(agree >= references.size * 0.98, "only $agree/${references.size} moves agree")
+            assertTrue(worstGap < 0.5f, "logit gap $worstGap")
         }
     }
 

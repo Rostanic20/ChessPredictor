@@ -9,4 +9,12 @@ data class ChessMove(
     val evaluation: Float = 0f,
     val isCheckmate: Boolean = false,
     val isCheck: Boolean = false
-)
+) {
+    fun toUci(): String = "$from$to" + when (promotion) {
+        is ChessPiece.Queen -> "q"
+        is ChessPiece.Rook -> "r"
+        is ChessPiece.Bishop -> "b"
+        is ChessPiece.Knight -> "n"
+        else -> ""
+    }
+}

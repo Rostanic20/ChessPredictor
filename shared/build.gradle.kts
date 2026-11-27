@@ -102,7 +102,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     }
 }
 
-val evalProperties = listOf("evalData", "evalOut", "evalVariant", "evalLimit", "evalSkip", "evalEngine", "maiaReference", "maiaModel")
+val evalProperties = listOf("evalData", "evalOut", "evalVariant", "evalLimit", "evalSkip", "evalEngine", "maiaReference", "maiaModel", "maiaWeights")
     .mapNotNull { key -> findProperty(key)?.let { key to it.toString() } }
 
 tasks.withType<Test>().configureEach {

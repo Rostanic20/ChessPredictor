@@ -2,7 +2,6 @@ package com.chesspredictor.domain.usecases
 
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.ChessOpening
-import com.chesspredictor.domain.entities.ChessPiece
 
 data class WeightedMove(
     val move: String,
@@ -64,7 +63,7 @@ class SimpleOpeningBook {
             val matched = SanMoveMatcher.match(san, legalMoves, state.turn) ?: break
 
             val positionKey = state.toPositionKey()
-            val uci = toUci(matched)
+            val uci = matched.toUci()
             bookMap.getOrPut(positionKey) { mutableListOf() }.add(WeightedMove(uci, weight, name))
 
             state = engine.makeMove(state, matched) ?: break
@@ -78,17 +77,6 @@ class SimpleOpeningBook {
         return popularityWeight * mainLineBonus * gamesBonus
     }
 
-    private fun toUci(move: ChessMove): String {
-        val base = "${move.from.file}${move.from.rank}${move.to.file}${move.to.rank}"
-        val promo = when (move.promotion) {
-            is ChessPiece.Queen -> "q"
-            is ChessPiece.Rook -> "r"
-            is ChessPiece.Bishop -> "b"
-            is ChessPiece.Knight -> "n"
-            else -> ""
-        }
-        return base + promo
-    }
 
     private fun fenToPositionKey(fen: String): String {
         val parts = fen.split(" ")

@@ -9,7 +9,10 @@ import com.chesspredictor.domain.entities.EngineAnalysis
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.humanlike.GamePhase
+import com.chesspredictor.domain.humanlike.HumanMovePredictor
 import com.chesspredictor.domain.humanlike.HumanThinkTime
+import com.chesspredictor.domain.humanlike.MaiaEncoding
+import com.chesspredictor.domain.humanlike.MaiaMoveChooser
 import com.chesspredictor.domain.humanlike.MoveKind
 import com.chesspredictor.domain.humanlike.ThinkCell
 import com.chesspredictor.domain.humanlike.ThinkPace
@@ -159,6 +162,49 @@ class EngineManagerTest {
         advanceTimeBy(301)
 
         assertEquals(listOf(e5), delivered)
+    }
+
+    private fun favouring(uci: String) = HumanMovePredictor { _, _, _ ->
+        FloatArray(MaiaEncoding.MOVE_COUNT).also { it[MaiaEncoding.moveIndex(uci, blackToMove = true)] = 50f }
+    }
+
+    @Test
+    fun theHumanModelChoosesTheMoveWithoutAskingStockfish() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(favouring("c7c5")),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(true) }
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true)) { delivered += it }
+        advanceTimeBy(120_000)
+
+        assertEquals(listOf("c7c5"), delivered.map { it.toUci() })
+        assertEquals(0, repository.replies.size)
+    }
+
+    @Test
+    fun aFailingHumanModelFallsBackToStockfish() = runTest {
+        val repository = PendingRepository()
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val broken = HumanMovePredictor { _, _, _ -> error("model missing") }
+        val manager = EngineManager(
+            repository, scope,
+            moveChooser = MaiaMoveChooser(broken),
+            background = StandardTestDispatcher(testScheduler)
+        ).also { it.setReady(true) }
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true)) { delivered += it }
+        runCurrent()
+        repository.replies.single().complete(e5)
+        advanceTimeBy(120_000)
+
+        assertEquals(listOf(e5), delivered)
+        assertNull(manager.error.value)
     }
 
     @Test

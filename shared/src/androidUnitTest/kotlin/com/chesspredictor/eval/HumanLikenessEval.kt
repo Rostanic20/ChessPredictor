@@ -4,7 +4,6 @@ import com.chesspredictor.data.repositories.ChessEngineRepositoryImpl
 import com.chesspredictor.data.utils.MoveParserImpl
 import com.chesspredictor.domain.entities.ChessBoard
 import com.chesspredictor.domain.entities.ChessMove
-import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.EngineDifficulty
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.GameState
@@ -109,7 +108,7 @@ class HumanLikenessEval {
                     }
                     consecutiveFailures = 0
 
-                    val engineUci = uci(move)
+                    val engineUci = move.toUci()
                     val result = Result(position.game, position.ply, position.band, variant, position.human, engineUci, engineUci == position.human)
                     writer.write(json.encodeToString(result))
                     writer.newLine()
@@ -155,17 +154,6 @@ class HumanLikenessEval {
             "plain" -> settings.copy(humanStyle = false)
             else -> error("unknown variant $variant")
         }
-    }
-
-    private fun uci(move: ChessMove): String {
-        val promotion = when (move.promotion) {
-            is ChessPiece.Queen -> "q"
-            is ChessPiece.Rook -> "r"
-            is ChessPiece.Bishop -> "b"
-            is ChessPiece.Knight -> "n"
-            else -> ""
-        }
-        return "${move.from}${move.to}$promotion"
     }
 
     private fun summary(results: File): String {

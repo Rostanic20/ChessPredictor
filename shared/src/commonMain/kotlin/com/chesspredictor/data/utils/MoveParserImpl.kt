@@ -55,14 +55,5 @@ class MoveParserImpl : MoveParser {
         }
     }
 
-    override fun toUciMove(move: ChessMove): String {
-        val base = "${move.from}${move.to}"
-        return when (move.promotion) {
-            is ChessPiece.Queen -> "${base}q"
-            is ChessPiece.Rook -> "${base}r"
-            is ChessPiece.Bishop -> "${base}b"
-            is ChessPiece.Knight -> "${base}n"
-            else -> base
-        }
-    }
+    override fun toUciMove(move: ChessMove): String = move.toUci()
 }
