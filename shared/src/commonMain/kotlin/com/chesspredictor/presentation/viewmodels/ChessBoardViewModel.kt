@@ -13,6 +13,7 @@ import com.chesspredictor.domain.entities.MoveCommentary
 import com.chesspredictor.domain.entities.OpeningInfo
 import com.chesspredictor.domain.entities.Square
 import com.chesspredictor.domain.entities.TimeControl
+import com.chesspredictor.domain.humanlike.ThinkPace
 import com.chesspredictor.data.repositories.GameStateRepository
 import com.chesspredictor.domain.usecases.ChessRulesEngine
 import com.chesspredictor.domain.usecases.OpeningDetector
@@ -327,10 +328,13 @@ class ChessBoardViewModel(
         val settings = settingsManager.engineSettings.value.let { settings ->
             if (budget == null) settings else settings.copy(timeLimit = settings.timeLimit.coerceAtMost(budget.toInt()))
         }
+        val timeControl = clock.timeControl.value
+        val remaining = clock.remaining.value.getValue(board.turn)
         engineManager.requestEngineMove(
             board = board,
             settings = settings,
-            maxThinkMs = budget
+            maxThinkMs = timeControl?.let { remaining / 3 },
+            pace = timeControl?.let { ThinkPace.of(it.initialTime, it.increment, remaining) } ?: ThinkPace.CASUAL
         ) { move ->
             if (gameStateManager.board.value.fen != board.fen) return@requestEngineMove
             executeMove(move.from, move.to, move.promotion)

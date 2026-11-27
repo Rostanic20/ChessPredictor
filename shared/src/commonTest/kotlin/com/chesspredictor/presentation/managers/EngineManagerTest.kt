@@ -8,6 +8,12 @@ import com.chesspredictor.domain.entities.ChessPiece
 import com.chesspredictor.domain.entities.EngineAnalysis
 import com.chesspredictor.domain.entities.EngineSettings
 import com.chesspredictor.domain.entities.Square
+import com.chesspredictor.domain.humanlike.GamePhase
+import com.chesspredictor.domain.humanlike.HumanThinkTime
+import com.chesspredictor.domain.humanlike.MoveKind
+import com.chesspredictor.domain.humanlike.ThinkCell
+import com.chesspredictor.domain.humanlike.ThinkPace
+import com.chesspredictor.domain.humanlike.TimeLeft
 import com.chesspredictor.domain.repositories.ChessEngineRepository
 import com.chesspredictor.domain.repositories.PositionAnalysis
 import kotlinx.coroutines.CompletableDeferred
@@ -16,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -23,6 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.random.Random
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EngineManagerTest {
@@ -121,6 +129,36 @@ class EngineManagerTest {
         assertEquals(listOf(e5, e5), delivered)
         assertFalse(manager.isThinking.value)
         assertNull(manager.error.value)
+    }
+
+    @Test
+    fun aHumanStyleMoveArrivesAfterTheSampledThinkTime() = runTest {
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(SlowAnalysisRepository(), scope, thinkTime = HumanThinkTime(Random(7))).also { it.setReady(true) }
+        val expected = HumanThinkTime(Random(7)).sampleMs(ThinkCell(GamePhase.OPENING, TimeLeft.PLENTY, MoveKind.NORMAL), ThinkPace.CASUAL)
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true)) { delivered += it }
+        advanceTimeBy(expected - 200)
+        assertEquals(emptyList(), delivered)
+        assertTrue(manager.isThinking.value)
+
+        advanceTimeBy(201)
+        assertEquals(listOf(e5), delivered)
+    }
+
+    @Test
+    fun theClockCapShortensTheThinkTime() = runTest {
+        val scope = TestScope(StandardTestDispatcher(testScheduler))
+        val manager = EngineManager(SlowAnalysisRepository(), scope, thinkTime = HumanThinkTime(Random(7))).also { it.setReady(true) }
+        val uncapped = HumanThinkTime(Random(7)).sampleMs(ThinkCell(GamePhase.OPENING, TimeLeft.PLENTY, MoveKind.NORMAL), ThinkPace.CASUAL)
+        assertTrue(uncapped > 400, "seed must give a think time above the cap, got $uncapped")
+        val delivered = mutableListOf<ChessMove>()
+
+        manager.requestEngineMove(board, EngineSettings(humanStyle = true), maxThinkMs = 300) { delivered += it }
+        advanceTimeBy(301)
+
+        assertEquals(listOf(e5), delivered)
     }
 
     @Test

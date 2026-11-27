@@ -4,7 +4,6 @@ import com.chesspredictor.domain.entities.ChessBoard
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.CommentaryType
 import com.chesspredictor.domain.entities.EmotionalState
-import com.chesspredictor.domain.entities.GameTimeControl
 import com.chesspredictor.domain.entities.HumanBehaviorProfile
 import com.chesspredictor.domain.entities.MoveCommentary
 import com.chesspredictor.presentation.ChessConstants
@@ -21,23 +20,6 @@ class HumanBehaviorManager(
 ) {
     companion object {
         private const val TAG = "HumanBehaviorManager"
-        private const val BASE_THINKING_TIME = 1000L
-        private const val MAX_THINKING_TIME = 8000L
-        private const val MIN_THINKING_TIME = 100L
-
-        private const val BLITZ_BASE_TIME = 600L
-        private const val BLITZ_MAX_TIME = 3000L
-        private const val BULLET_BASE_TIME = 300L
-        private const val BULLET_MAX_TIME = 1500L
-
-        private const val BULLET_COMPLEXITY_THRESHOLD = 0.7f
-        private const val BLITZ_COMPLEXITY_THRESHOLD = 0.8f
-        private const val HIGH_CONSISTENCY_THRESHOLD = 0.7f
-
-        private const val BULLET_HIGH_COMPLEXITY_MULTIPLIER = 1.8f
-        private const val BULLET_LOW_COMPLEXITY_MULTIPLIER = 0.6f
-        private const val BLITZ_HIGH_COMPLEXITY_MULTIPLIER = 2.0f
-        private const val BLITZ_LOW_COMPLEXITY_MULTIPLIER = 0.8f
     }
     
     private val _currentEmotionalState = MutableStateFlow(EmotionalState.FOCUSED)
@@ -50,72 +32,17 @@ class HumanBehaviorManager(
     val isShowingThoughts: StateFlow<Boolean> = _isShowingThoughts.asStateFlow()
     
     private var gameHistory = mutableListOf<Float>()
-    private var lastMoveTime = 0L
     private var consecutiveBadMoves = 0
     
-    fun calculateDisplayThinkingTime(
-        profile: HumanBehaviorProfile,
-        position: ChessBoard,
-        @Suppress("UNUSED_PARAMETER") actualEngineTime: Long,
-        timeControl: GameTimeControl = GameTimeControl.CLASSICAL
-    ): Long {
-        val complexity = estimatePositionComplexity(position)
-
-        val (baseTime, maxTime) = when (timeControl) {
-            GameTimeControl.BULLET -> BULLET_BASE_TIME to BULLET_MAX_TIME
-            GameTimeControl.BLITZ -> BLITZ_BASE_TIME to BLITZ_MAX_TIME
-            GameTimeControl.RAPID -> BASE_THINKING_TIME * 2 to MAX_THINKING_TIME * 2
-            GameTimeControl.CLASSICAL -> BASE_THINKING_TIME to MAX_THINKING_TIME
+    suspend fun think(durationMs: Long) {
+        _isShowingThoughts.value = true
+        try {
+            delay(durationMs)
+        } finally {
+            _isShowingThoughts.value = false
         }
-        
-        val basePersonalityTime = baseTime * (0.5f + profile.thinkingSpeed)
-
-        val complexityMultiplier = 1f + (complexity * profile.complexityReaction)
-
-        val pressureMultiplier = if (isPositionDeteriorating()) {
-            1f + (1f - profile.pressureResponse) * 0.5f
-        } else {
-            1f
-        }
-
-        val timePressureMultiplier = when (timeControl) {
-            GameTimeControl.BULLET -> {
-                if (complexity > BULLET_COMPLEXITY_THRESHOLD) BULLET_HIGH_COMPLEXITY_MULTIPLIER else BULLET_LOW_COMPLEXITY_MULTIPLIER
-            }
-            GameTimeControl.BLITZ -> {
-                if (complexity > BLITZ_COMPLEXITY_THRESHOLD) BLITZ_HIGH_COMPLEXITY_MULTIPLIER else BLITZ_LOW_COMPLEXITY_MULTIPLIER
-            }
-            else -> 1f
-        }
-
-        val consistencyVariation = if (profile.timeConsistency > HIGH_CONSISTENCY_THRESHOLD) {
-            Random.nextFloat() * 0.3f + 0.85f
-        } else {
-            Random.nextFloat() * 0.8f + 0.6f
-        }
-
-        val finalTime = (basePersonalityTime * complexityMultiplier *
-                        pressureMultiplier * timePressureMultiplier * consistencyVariation).toLong()
-
-        return finalTime.coerceIn(MIN_THINKING_TIME, maxTime)
     }
-    
-    fun calculateBlitzThinkingTime(
-        profile: HumanBehaviorProfile,
-        position: ChessBoard,
-        actualEngineTime: Long
-    ): Long {
-        return calculateDisplayThinkingTime(profile, position, actualEngineTime, GameTimeControl.BLITZ)
-    }
-    
-    fun calculateBulletThinkingTime(
-        profile: HumanBehaviorProfile,
-        position: ChessBoard,
-        actualEngineTime: Long
-    ): Long {
-        return calculateDisplayThinkingTime(profile, position, actualEngineTime, GameTimeControl.BULLET)
-    }
-    
+
     fun updateEmotionalState(
         profile: HumanBehaviorProfile,
         position: ChessBoard,
@@ -206,22 +133,6 @@ class HumanBehaviorManager(
         return commentary
     }
     
-    suspend fun simulateThinkingProcess(
-        profile: HumanBehaviorProfile,
-        thinkingTime: Long
-    ) {
-        if (!profile.showThoughts) return
-        
-        _isShowingThoughts.value = true
-
-        if (thinkingTime > 3000L) {
-            delay(thinkingTime / 3)
-            delay(thinkingTime / 3)
-        }
-        
-        _isShowingThoughts.value = false
-    }
-
     private fun generateTacticalExplanation(move: ChessMove, @Suppress("UNUSED_PARAMETER") position: ChessBoard): String {
         val explanations = listOf(
             "I see a tactical opportunity here with ${move.piece}",
@@ -258,15 +169,6 @@ class HumanBehaviorManager(
         return style.random()
     }
     
-    private fun estimatePositionComplexity(position: ChessBoard): Float {
-        val pieceCount = position.fen.count { it.isLetter() }
-        return when {
-            pieceCount < ChessConstants.PieceThresholds.MIDDLEGAME -> 0.3f
-            pieceCount > ChessConstants.PieceThresholds.OPENING -> 0.8f
-            else -> 0.6f
-        }
-    }
-
     private fun isTacticalPosition(position: ChessBoard): Boolean {
         return position.fen.count { it.isLetter() } > ChessConstants.PieceThresholds.TACTICAL && Random.nextFloat() < 0.4f
     }

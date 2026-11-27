@@ -5,8 +5,13 @@ import com.chesspredictor.domain.entities.ChessColor
 import com.chesspredictor.domain.entities.ChessMove
 import com.chesspredictor.domain.entities.EngineAnalysis
 import com.chesspredictor.domain.entities.EngineSettings
-import com.chesspredictor.domain.entities.GameTimeControl
+import com.chesspredictor.domain.humanlike.GamePhase
+import com.chesspredictor.domain.humanlike.HumanThinkTime
+import com.chesspredictor.domain.humanlike.MoveKind
+import com.chesspredictor.domain.humanlike.ThinkCell
+import com.chesspredictor.domain.humanlike.ThinkPace
 import com.chesspredictor.domain.repositories.ChessEngineRepository
+import com.chesspredictor.domain.usecases.ChessRulesEngine
 import com.chesspredictor.presentation.ChessConstants
 import com.chesspredictor.utils.ChessLogger
 import kotlinx.coroutines.CancellationException
@@ -22,14 +27,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.random.Random
+import kotlin.time.TimeSource
 
 class EngineManager(
     private val repository: ChessEngineRepository,
     private val scope: CoroutineScope,
-    private val humanBehaviorManager: HumanBehaviorManager? = null
+    private val humanBehaviorManager: HumanBehaviorManager? = null,
+    private val thinkTime: HumanThinkTime = HumanThinkTime(),
+    private val rules: ChessRulesEngine = ChessRulesEngine()
 ) {
     companion object {
         private const val TAG = "EngineManager"
+        private const val MIN_SEARCH_MS = 300
+        private const val FORCED_MOVE_LIMIT = 5
         private const val MIN_REACTION_TIME_MS = 100
         private const val MAX_REACTION_TIME_MS = 200
 
@@ -97,6 +107,7 @@ class EngineManager(
         board: ChessBoard,
         settings: EngineSettings,
         maxThinkMs: Long? = null,
+        pace: ThinkPace = ThinkPace.CASUAL,
         onMoveReady: (ChessMove) -> Unit
     ) {
         moveJob?.cancel()
@@ -120,30 +131,26 @@ class EngineManager(
                 _isThinking.value = true
                 _error.value = null
 
-                val finalSettings = if (settings.timeLimit <= 200) {
-                    settings
-                } else if (settings.humanStyle && humanBehaviorManager != null) {
-                    val timeControl = GameTimeControl.fromMoveTime(settings.timeLimit)
-                    val humanThinkingTime = humanBehaviorManager.calculateDisplayThinkingTime(
-                        settings.behaviorProfile,
-                        board,
-                        settings.timeLimit.toLong(),
-                        timeControl
-                    ).coerceAtMost(maxThinkMs ?: Long.MAX_VALUE).toInt()
+                val started = TimeSource.Monotonic.markNow()
+                val context = if (settings.humanStyle && settings.timeLimit > 200) MoveContext.of(board, rules) else null
+                var targetMs = context?.let { sampleThink(it, it.expectedKind, pace, maxThinkMs) }
+                val searchSettings = targetMs?.let {
+                    settings.copy(timeLimit = minOf(settings.timeLimit, maxOf(it.toInt(), MIN_SEARCH_MS)))
+                } ?: settings
 
-                    humanBehaviorManager.simulateThinkingProcess(settings.behaviorProfile, humanThinkingTime.toLong())
-
-                    settings.copy(timeLimit = humanThinkingTime)
-                } else {
-                    settings
-                }
-
-                val move = repository.analyzeBestMove(board, finalSettings)
+                val move = repository.analyzeBestMove(board, searchSettings)
                 if (move != null) {
                     val finalMove = if (settings.humanStyle) {
-                        applyHumanMistakes(move, board, settings)
+                        applyHumanMistakes(move, board, searchSettings)
                     } else {
                         move
+                    }
+
+                    if (context != null) {
+                        val kind = context.kindOf(finalMove)
+                        if (kind != context.expectedKind) targetMs = sampleThink(context, kind, pace, maxThinkMs)
+                        val waitMs = (targetMs ?: 0L) - started.elapsedNow().inWholeMilliseconds
+                        if (waitMs > 0) humanBehaviorManager?.think(waitMs) ?: delay(waitMs)
                     }
 
                     ChessLogger.info(TAG, "Engine move successful: ${finalMove.from} -> ${finalMove.to}")
@@ -175,6 +182,35 @@ class EngineManager(
     
     fun clearError() {
         _error.value = null
+    }
+
+    private fun sampleThink(context: MoveContext, kind: MoveKind, pace: ThinkPace, maxThinkMs: Long?): Long =
+        thinkTime.sampleMs(ThinkCell(context.phase, pace.timeLeft, kind), pace).coerceAtMost(maxThinkMs ?: Long.MAX_VALUE)
+
+    private class MoveContext(val phase: GamePhase, private val forced: Boolean, private val lastCapture: ChessMove?) {
+        val expectedKind: MoveKind = when {
+            lastCapture != null -> MoveKind.RECAPTURE
+            forced -> MoveKind.FORCED
+            else -> MoveKind.NORMAL
+        }
+
+        fun kindOf(move: ChessMove): MoveKind = when {
+            lastCapture != null && move.capturedPiece != null && move.to == lastCapture.to -> MoveKind.RECAPTURE
+            forced -> MoveKind.FORCED
+            else -> MoveKind.NORMAL
+        }
+
+        companion object {
+            fun of(board: ChessBoard, rules: ChessRulesEngine): MoveContext {
+                val state = rules.withStatus(rules.parseGameState(board.fen))
+                val pieces = board.fen.substringBefore(' ').count { it.isLetter() }
+                return MoveContext(
+                    phase = GamePhase.of(board.moveHistory.size, pieces),
+                    forced = state.isCheck || rules.getLegalMoves(state).size <= FORCED_MOVE_LIMIT,
+                    lastCapture = board.moveHistory.lastOrNull()?.takeIf { it.capturedPiece != null }
+                )
+            }
+        }
     }
 
     private suspend fun reactToOwnMove(board: ChessBoard, move: ChessMove, settings: EngineSettings) {
